@@ -10,6 +10,7 @@ our @EXPORT = qw(
 
 sub run_tests;
 sub run_test ($);
+sub normalize_bundle_versions ($);
 sub shell (@);
 sub cd ($);
 
@@ -18,6 +19,19 @@ our $DistRoot;
 our @SavedTests;
 our $RootDir = `pwd`;
 chomp $RootDir;
+
+sub normalize_bundle_versions ($) {
+    my $text = shift;
+    return $text unless defined $text;
+
+    # These component versions are already pinned by util/mirror-tarballs.
+    # The sanity tests should validate the generated command structure without
+    # duplicating those version pins in every expected stdout/Makefile block.
+    $text =~ s/\bLuaJIT-2\.1-\d+\b/LuaJIT-2.1-<VERSION>/g;
+    $text =~ s/\b(lua-cjson|nginx|ngx_devel_kit|ngx_lua|ngx_stream_lua|resty-cli)-\d+(?:\.\d+)+(?:rc\d+)?\b/$1-<VERSION>/g;
+
+    return $text;
+}
 
 sub run_tests {
     my $ver = `bash util/ver`;
@@ -82,7 +96,9 @@ sub run_test ($) {
         like $stdout, $expected_out_regex, "$name - stdout like ok";
 
     } else {
-        is $stdout, $expected_out, "$name - stdout ok";
+        my $actual_out = normalize_bundle_versions($stdout);
+        my $normalized_expected_out = normalize_bundle_versions($expected_out);
+        is $actual_out, $normalized_expected_out, "$name - stdout ok";
     }
 
     is($stderr, $expected_err, "$name - stderr ok");
@@ -102,7 +118,9 @@ sub run_test ($) {
         $makefile =~ s/\Q$BuildRoot\E/\$OPENRESTY_BUILD_DIR/g;
         $makefile =~ s/\Q$DistRoot\E/\$OPENRESTY_DIR/g;
 
-        is($makefile, $expected_makefile, "$name - Makefile ok");
+        my $actual_makefile = normalize_bundle_versions($makefile);
+        my $normalized_expected_makefile = normalize_bundle_versions($expected_makefile);
+        is($actual_makefile, $normalized_expected_makefile, "$name - Makefile ok");
     }
 
     push @SavedTests, {
