@@ -122,6 +122,7 @@
  u_char *ngx_http_lua_gen_chunk_cache_key(ngx_conf_t *cf, const char *tag,
      const u_char *src, size_t src_len);
  u_char *ngx_http_lua_gen_file_cache_key(ngx_conf_t *cf, const u_char *src,
+     size_t src_len);
 --- a/src/ngx_http_lua_directive.c
 +++ b/src/ngx_http_lua_directive.c
 @@ -1373,6 +1373,11 @@ ngx_http_lua_init_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
