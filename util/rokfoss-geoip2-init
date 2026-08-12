@@ -1,0 +1,63 @@
+#!/bin/sh
+
+set -eu
+
+geoip_dir=${ROKFOSS_GEOIP_DIR:-/etc/nginx/geoip}
+base_url=${ROKFOSS_GEOIP_BASE_URL:-https://raw.githubusercontent.com/infosec-au/GeoLite-mmdb-csv/download}
+
+log()
+{
+    printf '%s\n' "[ROKFOSS GeoIP2] $*" >&2
+}
+
+download()
+{
+    name=$1
+    minimum_size=$2
+    destination="$geoip_dir/$name"
+
+    if [ -s "$destination" ]; then
+        return
+    fi
+
+    temporary="$destination.tmp.$$"
+    trap 'rm -f "$temporary"' EXIT HUP INT TERM
+
+    log "$name not found; downloading it once."
+
+    if command -v wget >/dev/null 2>&1; then
+        wget -q --https-only --tries=3 --timeout=30 \
+            -O "$temporary" "$base_url/$name"
+    elif command -v curl >/dev/null 2>&1; then
+        curl -fsSL --retry 3 --connect-timeout 30 \
+            -o "$temporary" "$base_url/$name"
+    else
+        log "wget or curl is required to download $name."
+        exit 1
+    fi
+
+    size=$(wc -c < "$temporary")
+    if [ "$size" -lt "$minimum_size" ]; then
+        log "$name download is unexpectedly small ($size bytes)."
+        exit 1
+    fi
+
+    if command -v mmdblookup >/dev/null 2>&1; then
+        if ! mmdblookup --file "$temporary" --ip 1.1.1.1 >/dev/null 2>&1; then
+            log "$name is not a readable MaxMind database."
+            exit 1
+        fi
+    fi
+
+    chmod 0644 "$temporary"
+    mv -f "$temporary" "$destination"
+    trap - EXIT HUP INT TERM
+
+    log "$name installed."
+}
+
+mkdir -p "$geoip_dir"
+
+download GeoLite2-ASN.mmdb 1000000
+download GeoLite2-City.mmdb 10000000
+download GeoLite2-Country.mmdb 1000000

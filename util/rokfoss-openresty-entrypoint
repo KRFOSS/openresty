@@ -1,0 +1,18 @@
+#!/bin/sh
+
+set -eu
+
+init_script=${ROKFOSS_GEOIP_INIT:-/usr/local/bin/rokfoss-geoip2-init}
+
+if [ ! -x "$init_script" ]; then
+    printf '%s\n' "[ROKFOSS GeoIP2] initializer is not executable: $init_script" >&2
+    exit 1
+fi
+
+case ${1:-} in
+    openresty|nginx|*/openresty|*/nginx)
+        "$init_script"
+        ;;
+esac
+
+exec "$@"

@@ -185,6 +185,10 @@ sed $"s/NGINX_VERSION \".unknown\"/NGINX_VERSION \".$minor_ver\"/" server_header
 patch -p1 < server_header.patch || exit 1
 echo
 
+echo "$info_txt applying the ROKFOSS default logging and Korean CLI patch"
+patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_defaults.patch || exit 1
+echo
+
 #patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-redirect_memcpy_overlap.patch || exit 1
 
 echo "$info_txt applying the no_error_pages patch for nginx"
@@ -1146,6 +1150,8 @@ cp $root/util/install bundle/ || exit 1
 mkdir util || exit 1
 cp $root/util/package-win32.sh util/ || exit 1
 cp $root/util/build-win32.sh util/ || exit 1
+cp $root/util/rokfoss-geoip2-init util/ || exit 1
+cp $root/util/rokfoss-openresty-entrypoint util/ || exit 1
 cp $root/COPYRIGHT ./ || exit 1
 perl bundle/$resty_cli/bin/md2pod.pl $root/doc/README-windows.md | pod2text > README-windows.txt || exit 1
 unix2dos README-windows.txt || exit 1
