@@ -22,10 +22,6 @@ jobs:
             runner: ubuntu-22.04
           - arch: arm64
             runner: ubuntu-22.04-arm
-          - arch: s390x
-            runner: ubuntu-22.04-s390x
-          - arch: ppc64le
-            runner: ubuntu-22.04-ppc64le
 
     env:
       JOBS: 3
