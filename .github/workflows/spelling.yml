@@ -26,7 +26,17 @@ on:
   push:
     branches: ["**"]
     tags-ignore: ["**"]
+    paths-ignore:
+      - 'doc/**'
+      - '**/*.md'
+      - '**/*.markdown'
+      - '**/COPYRIGHT'
   pull_request_target:
+    paths-ignore:
+      - 'doc/**'
+      - '**/*.md'
+      - '**/*.markdown'
+      - '**/COPYRIGHT'
   issue_comment:
     types: [created]
 

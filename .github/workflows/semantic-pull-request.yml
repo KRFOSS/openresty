@@ -6,6 +6,11 @@ on:
       - opened
       - edited
       - synchronize
+    paths-ignore:
+      - 'doc/**'
+      - '**/*.md'
+      - '**/*.markdown'
+      - '**/COPYRIGHT'
 
 jobs:
   main:

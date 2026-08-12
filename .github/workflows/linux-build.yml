@@ -3,8 +3,18 @@ name: Linux build and test
 on:
   push:
     branches: [master]
+    paths-ignore:
+      - 'doc/**'
+      - '**/*.md'
+      - '**/*.markdown'
+      - '**/COPYRIGHT'
   pull_request:
     branches: [master]
+    paths-ignore:
+      - 'doc/**'
+      - '**/*.md'
+      - '**/*.markdown'
+      - '**/COPYRIGHT'
   workflow_dispatch:
 
 permissions:
