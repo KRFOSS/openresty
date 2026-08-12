@@ -261,4 +261,31 @@ CONF
     ok !-e $marker, 'openresty -t compiles Lua without executing it';
 }
 
+{
+    my ($exit, $stdout, $stderr, $dir) = run_config_test(
+        $base . <<'CONF'
+http {
+    access_by_lua_block {
+        ddd
+        local ok = true
+    }
+}
+CONF
+    );
+
+    my $conf = File::Spec->catfile($dir, 'nginx.conf');
+
+    isnt $exit, 0, 'invalid statement before local fails openresty -t';
+    like(
+        $stderr,
+        qr/\Q$conf\E:8(?:\D|$)/,
+        'Lua parser line is mapped to the absolute nginx configuration line'
+    );
+    unlike(
+        $stderr,
+        qr/\Q$conf\E:10(?:\D|$)/,
+        'Lua syntax error does not point at the closing block brace'
+    );
+}
+
 done_testing();
