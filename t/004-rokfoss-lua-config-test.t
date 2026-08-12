@@ -121,6 +121,128 @@ CONF
 }
 
 {
+    my ($exit, $stdout, $stderr) = run_config_test(
+        $base . <<'CONF'
+http {
+    server {
+        listen 127.0.0.1:8080;
+        location / {
+            content_by_lua_block {
+                local broken =
+            }
+        }
+    }
+}
+CONF
+    );
+
+    isnt $exit, 0, 'invalid content_by_lua_block fails openresty -t';
+    like $stderr, qr/Lua/, 'content_by_lua_block syntax error is reported';
+}
+
+{
+    my ($exit, $stdout, $stderr) = run_config_test(
+        $base . <<'CONF'
+http {
+    server {
+        listen 127.0.0.1:8080;
+        location / {
+            content_by_lua_file missing-content.lua;
+        }
+    }
+}
+CONF
+    );
+
+    isnt $exit, 0, 'missing content_by_lua_file fails openresty -t';
+    like $stderr, qr/Lua/, 'missing content_by_lua_file is reported';
+}
+
+{
+    my ($exit, $stdout, $stderr) = run_config_test(
+        $base . <<'CONF'
+http {
+    init_worker_by_lua_block {
+        local ok = true
+    }
+}
+CONF
+    );
+
+    is $exit, 0, 'valid init_worker_by_lua_block passes openresty -t';
+}
+
+{
+    my ($exit, $stdout, $stderr) = run_config_test(
+        $base . <<'CONF'
+http {
+    init_worker_by_lua_block {
+        local broken =
+    }
+}
+CONF
+    );
+
+    isnt $exit, 0, 'invalid init_worker_by_lua_block fails openresty -t';
+    like $stderr, qr/Lua/, 'init_worker_by_lua_block syntax error is reported';
+}
+
+{
+    my ($exit, $stdout, $stderr) = run_config_test(
+        $base . <<'CONF'
+http {
+    init_worker_by_lua_file missing-worker.lua;
+}
+CONF
+    );
+
+    isnt $exit, 0, 'missing init_worker_by_lua_file fails openresty -t';
+    like $stderr, qr/Lua/, 'missing init_worker_by_lua_file is reported';
+}
+
+{
+    my ($exit, $stdout, $stderr) = run_config_test(
+        $base . <<'CONF'
+http {
+    exit_worker_by_lua_block {
+        local ok = true
+    }
+}
+CONF
+    );
+
+    is $exit, 0, 'valid exit_worker_by_lua_block passes openresty -t';
+}
+
+{
+    my ($exit, $stdout, $stderr) = run_config_test(
+        $base . <<'CONF'
+http {
+    exit_worker_by_lua_block {
+        local broken =
+    }
+}
+CONF
+    );
+
+    isnt $exit, 0, 'invalid exit_worker_by_lua_block fails openresty -t';
+    like $stderr, qr/Lua/, 'exit_worker_by_lua_block syntax error is reported';
+}
+
+{
+    my ($exit, $stdout, $stderr) = run_config_test(
+        $base . <<'CONF'
+http {
+    exit_worker_by_lua_file missing-exit.lua;
+}
+CONF
+    );
+
+    isnt $exit, 0, 'missing exit_worker_by_lua_file fails openresty -t';
+    like $stderr, qr/Lua/, 'missing exit_worker_by_lua_file is reported';
+}
+
+{
     my $dir = tempdir(CLEANUP => 1);
     my $marker = File::Spec->catfile($dir, 'must-not-exist');
     my $lua_marker = $marker;
