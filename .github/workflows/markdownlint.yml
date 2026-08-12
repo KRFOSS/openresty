@@ -16,7 +16,7 @@ on:
       - '**/COPYRIGHT'
 
 jobs:
-  lint-content::
+  lint-content:
     name: Lint content markdown files
     runs-on: ubuntu-latest
     steps:
