@@ -1,0 +1,113 @@
+--- a/src/ngx_http_lua_cache.c
++++ b/src/ngx_http_lua_cache.c
+@@ -347,6 +347,88 @@ error:
+ }
+ 
+ 
++static ngx_int_t
++ngx_http_lua_rokfoss_test_inline(ngx_conf_t *cf, const char *tag,
++    const u_char *src, size_t src_len)
++{
++    int          rc;
++    lua_State   *L;
++    const char  *err;
++
++    if (!ngx_test_config) {
++        return NGX_OK;
++    }
++
++    L = luaL_newstate();
++    if (L == NULL) {
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Lua 문법 검사용 VM을 초기화하지 못했습니다");
++        return NGX_ERROR;
++    }
++
++    luaL_openlibs(L);
++
++    rc = ngx_http_lua_clfactory_loadbuffer(L, (char *) src, src_len, tag);
++    if (rc != 0) {
++        err = lua_isstring(L, -1) ? lua_tostring(L, -1) : "unknown error";
++
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Lua 문법 검사에 실패했습니다 (%s): %s",
++                           tag, err);
++        lua_close(L);
++        return NGX_ERROR;
++    }
++
++    lua_close(L);
++    return NGX_OK;
++}
++
++
++static ngx_int_t
++ngx_http_lua_rokfoss_test_file(ngx_conf_t *cf, const u_char *src,
++    size_t src_len)
++{
++    int          rc;
++    u_char      *script;
++    lua_State   *L;
++    const char  *err;
++
++    if (!ngx_test_config) {
++        return NGX_OK;
++    }
++
++    script = ngx_http_lua_rebase_path(cf->pool, (u_char *) src, src_len);
++    if (script == NULL) {
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Lua 파일 경로를 확인하지 못했습니다");
++        return NGX_ERROR;
++    }
++
++    L = luaL_newstate();
++    if (L == NULL) {
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Lua 파일 검사용 VM을 초기화하지 못했습니다");
++        return NGX_ERROR;
++    }
++
++    luaL_openlibs(L);
++
++    rc = ngx_http_lua_clfactory_loadfile(L, (char *) script);
++    if (rc != 0) {
++        err = lua_isstring(L, -1) ? lua_tostring(L, -1) : "unknown error";
++
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Lua 파일 검사에 실패했습니다 (\"%s\"): %s",
++                           script, err);
++        lua_close(L);
++        return NGX_ERROR;
++    }
++
++    lua_close(L);
++    return NGX_OK;
++}
++
++
+ u_char *
+ ngx_http_lua_gen_chunk_cache_key(ngx_conf_t *cf, const char *tag,
+     const u_char *src, size_t src_len)
+@@ -355,6 +431,10 @@ ngx_http_lua_gen_chunk_cache_key(ngx_conf_t *cf, const char *tag,
+     u_char      *p, *out;
+     size_t       tag_len;
+ 
++    if (ngx_http_lua_rokfoss_test_inline(cf, tag, src, src_len) != NGX_OK) {
++        return NULL;
++    }
++
+     tag_len = ngx_strlen(tag);
+ 
+     out = ngx_palloc(cf->pool, tag_len + NGX_HTTP_LUA_INLINE_KEY_LEN + 2);
+@@ -398,6 +478,10 @@ ngx_http_lua_gen_file_cache_key(ngx_conf_t *cf, const u_char *src,
+ {
+     u_char      *out;
+ 
++    if (ngx_http_lua_rokfoss_test_file(cf, src, src_len) != NGX_OK) {
++        return NULL;
++    }
++
+     out = ngx_palloc(cf->pool, NGX_HTTP_LUA_FILE_KEY_LEN + 1);
+     if (out == NULL) {
+         return NULL;
