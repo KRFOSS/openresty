@@ -113,7 +113,7 @@
          return NULL;
 --- a/src/ngx_http_lua_cache.h
 +++ b/src/ngx_http_lua_cache.h
-@@ -16,6 +16,10 @@ ngx_int_t ngx_http_lua_cache_loadfile(ngx_log_t *log, lua_State *L,
+@@ -16,5 +16,9 @@ ngx_int_t ngx_http_lua_cache_loadfile(ngx_log_t *log, lua_State *L,
      const u_char *script, int *cache_ref, const u_char *cache_key);
 +ngx_int_t ngx_http_lua_rokfoss_test_inline(ngx_conf_t *cf, const char *tag,
 +    const u_char *src, size_t src_len);
@@ -137,7 +137,7 @@
          name = ngx_http_lua_rebase_path(cf->pool, value[1].data,
                                          value[1].len);
          if (name == NULL) {
-@@ -1384,6 +1389,11 @@ ngx_http_lua_init_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+@@ -1384,6 +1389,12 @@ ngx_http_lua_init_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
          lmcf->init_src.len = ngx_strlen(name);
  
      } else {
@@ -150,7 +150,7 @@
          lmcf->init_src = value[1];
  
          chunkname = ngx_http_lua_gen_chunk_name(cf, "init_by_lua",
-@@ -1433,6 +1443,11 @@ ngx_http_lua_init_worker_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+@@ -1433,6 +1444,11 @@ ngx_http_lua_init_worker_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
      lmcf->init_worker_handler = (ngx_http_lua_main_conf_handler_pt) cmd->post;
  
      if (cmd->post == ngx_http_lua_init_worker_by_file) {
@@ -162,7 +162,7 @@
          name = ngx_http_lua_rebase_path(cf->pool, value[1].data,
                                          value[1].len);
          if (name == NULL) {
-@@ -1444,6 +1459,11 @@ ngx_http_lua_init_worker_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+@@ -1444,6 +1460,12 @@ ngx_http_lua_init_worker_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
          lmcf->init_worker_src.len = ngx_strlen(name);
  
      } else {
@@ -175,7 +175,7 @@
          lmcf->init_worker_src = value[1];
  
          chunkname = ngx_http_lua_gen_chunk_name(cf, "init_worker_by_lua",
-@@ -1494,6 +1514,11 @@ ngx_http_lua_exit_worker_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+@@ -1494,6 +1516,11 @@ ngx_http_lua_exit_worker_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
      lmcf->exit_worker_handler = (ngx_http_lua_main_conf_handler_pt) cmd->post;
  
      if (cmd->post == ngx_http_lua_exit_worker_by_file) {
@@ -187,7 +187,7 @@
          name = ngx_http_lua_rebase_path(cf->pool, value[1].data,
                                          value[1].len);
          if (name == NULL) {
-@@ -1505,6 +1530,11 @@ ngx_http_lua_exit_worker_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+@@ -1505,6 +1532,12 @@ ngx_http_lua_exit_worker_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
          lmcf->exit_worker_src.len = ngx_strlen(name);
  
      } else {
