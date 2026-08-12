@@ -27,12 +27,14 @@ on:
     branches: ["**"]
     tags-ignore: ["**"]
     paths-ignore:
+      - '.github/workflows/**'
       - 'doc/**'
       - '**/*.md'
       - '**/*.markdown'
       - '**/COPYRIGHT'
   pull_request_target:
     paths-ignore:
+      - '.github/workflows/**'
       - 'doc/**'
       - '**/*.md'
       - '**/*.markdown'

@@ -2,12 +2,14 @@ name: Linting on markdown files
 on:
   pull_request_target:
     paths-ignore:
+      - '.github/workflows/**'
       - 'doc/**'
       - '**/*.md'
       - '**/*.markdown'
       - '**/COPYRIGHT'
   push:
     paths-ignore:
+      - '.github/workflows/**'
       - 'doc/**'
       - '**/*.md'
       - '**/*.markdown'
