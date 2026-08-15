@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>ROKFOSS Mirror</title>
+<style>
+__CSS__
+</style>
+</head>
+<body>
+<header class="idx-top">
+<div class="idx-brand"><span class="idx-shield">ROKFOSS</span> Mirror</div>
+<nav class="idx-crumbs" id="idx-crumbs" aria-label="경로"></nav>
+</header>
+<main class="idx-main">
+<div class="idx-toolbar">
+<input type="search" id="idx-search" class="idx-search" placeholder="이 디렉터리에서 검색 (파일명 입력)" autocomplete="off" spellcheck="false" aria-label="파일 검색">
+<div class="idx-stats" id="idx-stats" role="status" aria-live="polite"></div>
+</div>
+<div class="idx-head" role="row">
+<button class="idx-h idx-h-name" data-sort="name" type="button">이름</button>
+<button class="idx-h idx-h-size" data-sort="size" type="button">크기</button>
+<button class="idx-h idx-h-date" data-sort="mtime" type="button">수정일</button>
+</div>
+<div class="idx-viewport" id="idx-viewport" tabindex="0">
+<div class="idx-spacer" id="idx-spacer"></div>
+<div class="idx-rows" id="idx-rows"></div>
+</div>
+<div class="idx-empty" id="idx-empty" hidden>검색 결과가 없습니다.</div>
+</main>
+<script id="idx-data" type="application/json">

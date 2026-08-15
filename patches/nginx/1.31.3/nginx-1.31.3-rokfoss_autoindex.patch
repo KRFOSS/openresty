@@ -1,0 +1,506 @@
+--- /dev/null
++++ b/src/http/modules/ngx_http_rokfoss_autoindex.h
+@@ -0,0 +1,292 @@
++#ifndef _NGX_HTTP_ROKFOSS_AUTOINDEX_H_INCLUDED_
++#define _NGX_HTTP_ROKFOSS_AUTOINDEX_H_INCLUDED_
++
++
++/* ROKFOSS-Shield autoindex 화면. util/gen_rokfoss_autoindex 로 생성됨. */
++
++
++static u_char ngx_http_rokfoss_autoindex_head[] =
++    "<!DOCTYPE html>\r\n"
++    "<html lang=\"ko\">\r\n"
++    "<head>\r\n"
++    "<meta charset=\"UTF-8\">\r\n"
++    "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\r\n"
++    "<meta name=\"color-scheme\" content=\"dark light\">\r\n"
++    "<title>ROKFOSS Mirror</title>\r\n"
++    "<style>\r\n"
++    ":root{--bg:#1a1a1a;--panel:#212121;--line:#2f2f2f;--text:#e5e5e5;--muted:#9a9a9a;--accent:#06b6d4;--dir:#7dd3fc;--hover:#262626}\r\n"
++    "@media (prefers-color-scheme:light){:root{--bg:#fafafa;--panel:#fff;--line:#e3e3e3;--text:#1b1b1b;--muted:#666;--accent:#0891b2;--dir:#0369a1;--hover:#f1f5f9}}\r\n"
++    "*{box-sizing:border-box}\r\n"
++    "html,body{margin:0;padding:0;height:100%}\r\n"
++    "body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Noto Sans KR\",sans-serif;display:flex;flex-direction:column}\r\n"
++    "a{color:inherit;text-decoration:none}\r\n"
++    "a:hover{text-decoration:underline}\r\n"
++    ":focus-visible{outline:2px solid var(--accent);outline-offset:2px}\r\n"
++    ".idx-top{padding:14px 20px;border-bottom:1px solid var(--line);background:var(--panel)}\r\n"
++    ".idx-brand{font-size:14px;font-weight:700;letter-spacing:.02em;margin-bottom:6px}\r\n"
++    ".idx-shield{color:var(--accent)}\r\n"
++    ".idx-crumbs{font-size:13px;color:var(--muted);word-break:break-all}\r\n"
++    ".idx-crumbs a{color:var(--muted)}\r\n"
++    ".idx-crumbs a:last-child{color:var(--text);font-weight:600}\r\n"
++    ".idx-sep{opacity:.4;margin:0 2px}\r\n"
++    ".idx-main{flex:1;display:flex;flex-direction:column;min-height:0;padding:14px 20px 0}\r\n"
++    ".idx-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:10px}\r\n"
++    ".idx-search{flex:1;min-width:220px;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:14px}\r\n"
++    ".idx-search::placeholder{color:var(--muted)}\r\n"
++    ".idx-stats{font-size:13px;color:var(--muted);white-space:nowrap}\r\n"
++    ".idx-head{display:flex;border-bottom:1px solid var(--line);padding:0 4px}\r\n"
++    ".idx-h{background:none;border:0;color:var(--muted);font:inherit;font-size:12px;font-weight:600;letter-spacing:.04em;padding:8px 6px;cursor:pointer;text-align:left}\r\n"
++    ".idx-h:hover{color:var(--text)}\r\n"
++    ".idx-h[aria-sort]{color:var(--accent)}\r\n"
++    ".idx-h-name{flex:1;min-width:0}\r\n"
++    ".idx-h-size{width:110px;flex:none;text-align:right}\r\n"
++    ".idx-h-date{width:190px;flex:none}\r\n"
++    "@media(max-width:640px){.idx-h-date{display:none}.idx-h-size{width:86px}}\r\n"
++    ".idx-viewport{flex:1;overflow-y:auto;position:relative;min-height:0}\r\n"
++    ".idx-spacer{width:1px}\r\n"
++    ".idx-rows{position:absolute;top:0;left:0;right:0}\r\n"
++    ".idx-row{display:flex;align-items:center;padding:0 4px;border-bottom:1px solid var(--line);height:34px}\r\n"
++    ".idx-row:hover{background:var(--hover)}\r\n"
++    ".idx-name{flex:1;min-width:0;display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}\r\n"
++    ".idx-name a{overflow:hidden;text-overflow:ellipsis}\r\n"
++    ".idx-ico{width:16px;flex:none;text-align:center;opacity:.75;font-size:13px}\r\n"
++    ".idx-dir .idx-name a{color:var(--dir);font-weight:600}\r\n"
++    ".idx-size{width:110px;flex:none;text-align:right;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;padding-right:8px}\r\n"
++    ".idx-date{width:190px;flex:none;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}\r\n"
++    "@media(max-width:640px){.idx-date{display:none}.idx-size{width:86px}}\r\n"
++    ".idx-hit{background:rgba(6,182,212,.22);border-radius:3px}\r\n"
++    ".idx-empty{padding:40px 0;text-align:center;color:var(--muted);font-size:14px}\r\n"
++    "</style>\r\n"
++    "</head>\r\n"
++    "<body>\r\n"
++    "<header class=\"idx-top\">\r\n"
++    "<div class=\"idx-brand\"><span class=\"idx-shield\">ROKFOSS</span> Mirror</div>\r\n"
++    "<nav class=\"idx-crumbs\" id=\"idx-crumbs\" aria-label=\"경로\"></nav>\r\n"
++    "</header>\r\n"
++    "<main class=\"idx-main\">\r\n"
++    "<div class=\"idx-toolbar\">\r\n"
++    "<input type=\"search\" id=\"idx-search\" class=\"idx-search\" placeholder=\"이 디렉터리에서 검색 (파일명 입력)\" autocomplete=\"off\" spellcheck=\"false\" aria-label=\"파일 검색\">\r\n"
++    "<div class=\"idx-stats\" id=\"idx-stats\" role=\"status\" aria-live=\"polite\"></div>\r\n"
++    "</div>\r\n"
++    "<div class=\"idx-head\" role=\"row\">\r\n"
++    "<button class=\"idx-h idx-h-name\" data-sort=\"name\" type=\"button\">이름</button>\r\n"
++    "<button class=\"idx-h idx-h-size\" data-sort=\"size\" type=\"button\">크기</button>\r\n"
++    "<button class=\"idx-h idx-h-date\" data-sort=\"mtime\" type=\"button\">수정일</button>\r\n"
++    "</div>\r\n"
++    "<div class=\"idx-viewport\" id=\"idx-viewport\" tabindex=\"0\">\r\n"
++    "<div class=\"idx-spacer\" id=\"idx-spacer\"></div>\r\n"
++    "<div class=\"idx-rows\" id=\"idx-rows\"></div>\r\n"
++    "</div>\r\n"
++    "<div class=\"idx-empty\" id=\"idx-empty\" hidden>검색 결과가 없습니다.</div>\r\n"
++    "</main>\r\n"
++    "<script id=\"idx-data\" type=\"application/json\">\r\n";
++
++
++static u_char ngx_http_rokfoss_autoindex_tail[] =
++    "\r\n"
++    "</script>\r\n"
++    "<script>\r\n"
++    "(function(){\r\n"
++    "'use strict';\r\n"
++    "\r\n"
++    "var ROW_H = 34, OVERSCAN = 8;\r\n"
++    "\r\n"
++    "var raw = document.getElementById('idx-data').textContent;\r\n"
++    "var all;\r\n"
++    "try { all = JSON.parse(raw); } catch (e) { all = []; }\r\n"
++    "\r\n"
++    "// 제목과 빵부스러기는 현재 경로에서 만든다 (서버가 주입하지 않는다).\r\n"
++    "var path = decodeURIComponent(location.pathname);\r\n"
++    "document.title = path + ' · ROKFOSS Mirror';\r\n"
++    "(function(){\r\n"
++    "  var nav = document.getElementById('idx-crumbs');\r\n"
++    "  var html = ['<a href=\"/\">/</a>'], acc = '';\r\n"
++    "  var segs = path.split('/').filter(Boolean);\r\n"
++    "  for (var i = 0; i < segs.length; i++) {\r\n"
++    "    acc += '/' + segs[i];\r\n"
++    "    html.push('<span class=\"idx-sep\">/</span><a href=\"' +\r\n"
++    "              esc(acc + '/') + '\">' + esc(segs[i]) + '</a>');\r\n"
++    "  }\r\n"
++    "  nav.innerHTML = html.join('');\r\n"
++    "})();\r\n"
++    "\r\n"
++    "var viewport = document.getElementById('idx-viewport');\r\n"
++    "var spacer   = document.getElementById('idx-spacer');\r\n"
++    "var rowsBox  = document.getElementById('idx-rows');\r\n"
++    "var stats    = document.getElementById('idx-stats');\r\n"
++    "var empty    = document.getElementById('idx-empty');\r\n"
++    "var search   = document.getElementById('idx-search');\r\n"
++    "\r\n"
++    "var items = [];\r\n"
++    "for (var i = 0; i < all.length; i++) {\r\n"
++    "  var e = all[i];\r\n"
++    "  var dir = e.type === 'directory';\r\n"
++    "  var t = Date.parse(e.mtime);\r\n"
++    "  items.push({\r\n"
++    "    name: e.name,\r\n"
++    "    lower: e.name.toLowerCase(),\r\n"
++    "    dir: dir,\r\n"
++    "    size: dir ? -1 : (typeof e.size === 'number' ? e.size : -1),\r\n"
++    "    time: isNaN(t) ? 0 : t\r\n"
++    "  });\r\n"
++    "}\r\n"
++    "\r\n"
++    "function fmtSize(n){\r\n"
++    "  if (n < 0) return '-';\r\n"
++    "  if (n < 1024) return n + ' B';\r\n"
++    "  var u = ['KB','MB','GB','TB'], i = -1, v = n;\r\n"
++    "  do { v /= 1024; i++; } while (v >= 1024 && i < u.length - 1);\r\n"
++    "  return (v < 10 ? v.toFixed(1) : Math.round(v)) + ' ' + u[i];\r\n"
++    "}\r\n"
++    "\r\n"
++    "function fmtDate(ms){\r\n"
++    "  if (!ms) return '';\r\n"
++    "  var d = new Date(ms), p = function(x){ return x < 10 ? '0' + x : x; };\r\n"
++    "  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate())\r\n"
++    "         + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());\r\n"
++    "}\r\n"
++    "\r\n"
++    "function icon(it){\r\n"
++    "  if (it.dir) return '\\u{1F4C1}';\r\n"
++    "  var n = it.lower, dot = n.lastIndexOf('.'), ext = dot < 0 ? '' : n.slice(dot+1);\r\n"
++    "  if (ext === 'iso' || ext === 'img') return '\\u{1F4BF}';\r\n"
++    "  if (ext === 'deb' || ext === 'rpm' || ext === 'pkg' || ext === 'apk') return '\\u{1F4E6}';\r\n"
++    "  if (ext === 'gz'||ext==='xz'||ext==='zst'||ext==='bz2'||ext==='zip'||ext==='tar'||ext==='7z') return '\\u{1F5DC}';\r\n"
++    "  if (ext === 'asc'||ext==='sig'||ext==='gpg'||ext==='sha256'||ext==='sha512') return '\\u{1F511}';\r\n"
++    "  if (n.indexOf('readme') >= 0 || ext === 'txt' || ext === 'md') return '\\u{1F4C4}';\r\n"
++    "  return '\\u{1F4C4}';\r\n"
++    "}\r\n"
++    "\r\n"
++    "var sortKey = 'name', sortAsc = true;\r\n"
++    "\r\n"
++    "function cmp(a, b){\r\n"
++    "  if (a.dir !== b.dir) return a.dir ? -1 : 1;\r\n"
++    "  var r = 0;\r\n"
++    "  if (sortKey === 'size') r = a.size - b.size;\r\n"
++    "  else if (sortKey === 'mtime') r = a.time - b.time;\r\n"
++    "  else r = a.lower < b.lower ? -1 : (a.lower > b.lower ? 1 : 0);\r\n"
++    "  return sortAsc ? r : -r;\r\n"
++    "}\r\n"
++    "\r\n"
++    "var view = items.slice().sort(cmp);\r\n"
++    "var query = '';\r\n"
++    "\r\n"
++    "function applyFilter(){\r\n"
++    "  if (!query) {\r\n"
++    "    view = items.slice().sort(cmp);\r\n"
++    "  } else {\r\n"
++    "    var q = query.toLowerCase(), out = [];\r\n"
++    "    for (var i = 0; i < items.length; i++) {\r\n"
++    "      if (items[i].lower.indexOf(q) >= 0) out.push(items[i]);\r\n"
++    "    }\r\n"
++    "    view = out.sort(cmp);\r\n"
++    "  }\r\n"
++    "  viewport.scrollTop = 0;\r\n"
++    "  layout();\r\n"
++    "  render(true);\r\n"
++    "}\r\n"
++    "\r\n"
++    "function layout(){\r\n"
++    "  spacer.style.height = (view.length * ROW_H) + 'px';\r\n"
++    "  stats.textContent = query\r\n"
++    "    ? view.length.toLocaleString() + ' / ' + items.length.toLocaleString() + '개'\r\n"
++    "    : items.length.toLocaleString() + '개 항목';\r\n"
++    "  empty.hidden = view.length > 0;\r\n"
++    "}\r\n"
++    "\r\n"
++    "var lastStart = -1, lastEnd = -1;\r\n"
++    "\r\n"
++    "function render(force){\r\n"
++    "  var top = viewport.scrollTop;\r\n"
++    "  var h = viewport.clientHeight || 600;\r\n"
++    "  var start = Math.max(0, Math.floor(top / ROW_H) - OVERSCAN);\r\n"
++    "  var end = Math.min(view.length, Math.ceil((top + h) / ROW_H) + OVERSCAN);\r\n"
++    "\r\n"
++    "  if (!force && start === lastStart && end === lastEnd) return;\r\n"
++    "  lastStart = start; lastEnd = end;\r\n"
++    "\r\n"
++    "  var html = [];\r\n"
++    "  for (var i = start; i < end; i++) {\r\n"
++    "    var it = view[i];\r\n"
++    "    var href = encodeURIComponent(it.name) + (it.dir ? '/' : '');\r\n"
++    "    html.push(\r\n"
++    "      '<div class=\"idx-row', it.dir ? ' idx-dir' : '', '\" role=\"row\">',\r\n"
++    "        '<div class=\"idx-name\"><span class=\"idx-ico\">', icon(it), '</span>',\r\n"
++    "          '<a href=\"', href, '\" title=\"', esc(it.name), '\">', mark(it.name), '</a>',\r\n"
++    "        '</div>',\r\n"
++    "        '<div class=\"idx-size\">', fmtSize(it.size), '</div>',\r\n"
++    "        '<div class=\"idx-date\">', fmtDate(it.time), '</div>',\r\n"
++    "      '</div>'\r\n"
++    "    );\r\n"
++    "  }\r\n"
++    "\r\n"
++    "  rowsBox.style.transform = 'translateY(' + (start * ROW_H) + 'px)';\r\n"
++    "  rowsBox.innerHTML = html.join('');\r\n"
++    "}\r\n"
++    "\r\n"
++    "function esc(s){\r\n"
++    "  return s.replace(/[&<>\"']/g, function(c){\r\n"
++    "    return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c];\r\n"
++    "  });\r\n"
++    "}\r\n"
++    "\r\n"
++    "function mark(name){\r\n"
++    "  if (!query) return esc(name);\r\n"
++    "  var i = name.toLowerCase().indexOf(query.toLowerCase());\r\n"
++    "  if (i < 0) return esc(name);\r\n"
++    "  return esc(name.slice(0, i))\r\n"
++    "       + '<span class=\"idx-hit\">' + esc(name.slice(i, i + query.length)) + '</span>'\r\n"
++    "       + esc(name.slice(i + query.length));\r\n"
++    "}\r\n"
++    "\r\n"
++    "var ticking = false;\r\n"
++    "viewport.addEventListener('scroll', function(){\r\n"
++    "  if (ticking) return;\r\n"
++    "  ticking = true;\r\n"
++    "  requestAnimationFrame(function(){ render(); ticking = false; });\r\n"
++    "}, { passive: true });\r\n"
++    "\r\n"
++    "window.addEventListener('resize', function(){ render(true); });\r\n"
++    "\r\n"
++    "var timer = null;\r\n"
++    "search.addEventListener('input', function(){\r\n"
++    "  clearTimeout(timer);\r\n"
++    "  timer = setTimeout(function(){\r\n"
++    "    query = search.value.trim();\r\n"
++    "    applyFilter();\r\n"
++    "  }, 90);\r\n"
++    "});\r\n"
++    "\r\n"
++    "document.addEventListener('keydown', function(e){\r\n"
++    "  if (e.key === '/' && document.activeElement !== search) {\r\n"
++    "    e.preventDefault();\r\n"
++    "    search.focus();\r\n"
++    "    search.select();\r\n"
++    "  } else if (e.key === 'Escape' && document.activeElement === search) {\r\n"
++    "    search.value = ''; query = ''; applyFilter(); search.blur();\r\n"
++    "  }\r\n"
++    "});\r\n"
++    "\r\n"
++    "var heads = document.querySelectorAll('.idx-h');\r\n"
++    "for (var k = 0; k < heads.length; k++) {\r\n"
++    "  (function(btn){\r\n"
++    "    btn.addEventListener('click', function(){\r\n"
++    "      var key = btn.getAttribute('data-sort');\r\n"
++    "      if (sortKey === key) { sortAsc = !sortAsc; }\r\n"
++    "      else { sortKey = key; sortAsc = true; }\r\n"
++    "      for (var j = 0; j < heads.length; j++) heads[j].removeAttribute('aria-sort');\r\n"
++    "      btn.setAttribute('aria-sort', sortAsc ? 'ascending' : 'descending');\r\n"
++    "      applyFilter();\r\n"
++    "    });\r\n"
++    "  })(heads[k]);\r\n"
++    "}\r\n"
++    "\r\n"
++    "layout();\r\n"
++    "render(true);\r\n"
++    "})();\r\n"
++    "</script>\r\n"
++    "</body>\r\n"
++    "</html>\r\n";
++
++
++#endif /* _NGX_HTTP_ROKFOSS_AUTOINDEX_H_INCLUDED_ */
+--- a/src/http/modules/ngx_http_autoindex_module.c
++++ b/src/http/modules/ngx_http_autoindex_module.c
+@@ -9,6 +9,8 @@
+ #include <ngx_core.h>
+ #include <ngx_http.h>
+ 
++#include "ngx_http_rokfoss_autoindex.h"
++
+ 
+ #if 0
+ 
+@@ -57,6 +59,10 @@
+ 
+ static ngx_buf_t *ngx_http_autoindex_html(ngx_http_request_t *r,
+     ngx_array_t *entries);
++static ngx_buf_t *ngx_http_autoindex_rokfoss(ngx_http_request_t *r,
++    ngx_array_t *entries);
++static uintptr_t ngx_http_autoindex_rokfoss_escape(u_char *dst, u_char *src,
++    size_t size);
+ static ngx_buf_t *ngx_http_autoindex_json(ngx_http_request_t *r,
+     ngx_array_t *entries, ngx_str_t *callback);
+ static ngx_int_t ngx_http_autoindex_jsonp_callback(ngx_http_request_t *r,
+@@ -406,7 +412,8 @@
+         break;
+ 
+     default: /* NGX_HTTP_AUTOINDEX_HTML */
+-        b = ngx_http_autoindex_html(r, &entries);
++        /* ROKFOSS: 내장 표 대신 커스텀 화면을 낸다. */
++        b = ngx_http_autoindex_rokfoss(r, &entries);
+         break;
+     }
+ 
+@@ -429,6 +436,178 @@
+ }
+ 
+ 
++/*
++ * ROKFOSS: 파일명을 <script> 안 JSON 문자열에 안전하게 넣기 위한 이스케이프.
++ *
++ * ngx_escape_json 은 " \ 와 제어문자만 처리한다. 그런데 파일명은 동기화로
++ * 들어오는 신뢰할 수 없는 값이라 "</script>" 가 들어 있으면 HTML 파서가
++ * 스크립트를 거기서 끊어버린다(JSON 문법과 무관한 XSS). 그래서 < > 도
++ * < > 로 바꾼다. 0x80 이상 바이트(UTF-8, 한글 등)는 그대로 둔다.
++ *
++ * dst 가 NULL 이면 원본 대비 늘어나는 바이트 수만 센다.
++ */
++static uintptr_t
++ngx_http_autoindex_rokfoss_escape(u_char *dst, u_char *src, size_t size)
++{
++    u_char      ch;
++    ngx_uint_t  len;
++
++    if (dst == NULL) {
++        len = 0;
++
++        while (size) {
++            ch = *src++;
++            size--;
++
++            if (ch == '"' || ch == '\\' || ch == '\b' || ch == '\f'
++                || ch == '\n' || ch == '\r' || ch == '\t')
++            {
++                len += 1;
++
++            } else if (ch == '<' || ch == '>' || ch < 0x20) {
++                len += sizeof("\\u001F") - 2;
++            }
++        }
++
++        return (uintptr_t) len;
++    }
++
++    while (size) {
++        ch = *src++;
++        size--;
++
++        if (ch > 0x1f && ch != '"' && ch != '\\' && ch != '<' && ch != '>') {
++            *dst++ = ch;
++            continue;
++        }
++
++        switch (ch) {
++        case '"':  *dst++ = '\\'; *dst++ = '"';  break;
++        case '\\': *dst++ = '\\'; *dst++ = '\\'; break;
++        case '\b': *dst++ = '\\'; *dst++ = 'b';  break;
++        case '\f': *dst++ = '\\'; *dst++ = 'f';  break;
++        case '\n': *dst++ = '\\'; *dst++ = 'n';  break;
++        case '\r': *dst++ = '\\'; *dst++ = 'r';  break;
++        case '\t': *dst++ = '\\'; *dst++ = 't';  break;
++        default:
++            /* < > 와 나머지 제어문자는 \u00XX 로 */
++            *dst++ = '\\'; *dst++ = 'u'; *dst++ = '0'; *dst++ = '0';
++            *dst++ = "0123456789abcdef"[ch >> 4];
++            *dst++ = "0123456789abcdef"[ch & 0xf];
++        }
++    }
++
++    return (uintptr_t) dst;
++}
++
++
++/*
++ * ROKFOSS: 커스텀 디렉터리 화면.
++ *
++ * 검증된 nginx JSON 직렬화(name/type/mtime/size)를 그대로 쓰되, 정적 껍데기
++ * (head + CSS + JS) 로 감싼다. 브라우저에는 행 HTML 을 보내지 않는다. 데이터만
++ * 보내고 화면에 보이는 만큼만 그려서 수천 개 디렉터리에서도 멈추지 않는다.
++ */
++static ngx_buf_t *
++ngx_http_autoindex_rokfoss(ngx_http_request_t *r, ngx_array_t *entries)
++{
++    size_t                       len, entry_len;
++    ngx_buf_t                   *b;
++    ngx_uint_t                   i;
++    ngx_http_autoindex_entry_t  *entry;
++
++    len = sizeof(ngx_http_rokfoss_autoindex_head) - 1
++        + sizeof(ngx_http_rokfoss_autoindex_tail) - 1
++        + sizeof("[]") - 1;
++
++    entry = entries->elts;
++
++    for (i = 0; i < entries->nelts; i++) {
++        entry[i].escape = ngx_http_autoindex_rokfoss_escape(NULL,
++                                                            entry[i].name.data,
++                                                            entry[i].name.len);
++
++        entry_len = sizeof("{\"name\":\"\",\"type\":\"directory\","
++                           "\"mtime\":\"Wed, 31 Dec 1986 10:00:00 GMT\"},") - 1
++                  + entry[i].name.len + entry[i].escape;
++
++        if (entry[i].file) {
++            entry_len += sizeof(",\"size\":") - 1 + NGX_OFF_T_LEN;
++        }
++
++        if (len > NGX_MAX_SIZE_T_VALUE - entry_len) {
++            return NULL;
++        }
++
++        len += entry_len;
++    }
++
++    b = ngx_create_temp_buf(r->pool, len);
++    if (b == NULL) {
++        return NULL;
++    }
++
++    b->last = ngx_cpymem(b->last, ngx_http_rokfoss_autoindex_head,
++                         sizeof(ngx_http_rokfoss_autoindex_head) - 1);
++
++    *b->last++ = '[';
++
++    for (i = 0; i < entries->nelts; i++) {
++        if (i > 0) {
++            *b->last++ = ',';
++        }
++
++        b->last = ngx_cpymem(b->last, "{\"name\":\"",
++                             sizeof("{\"name\":\"") - 1);
++
++        if (entry[i].escape) {
++            b->last = (u_char *) ngx_http_autoindex_rokfoss_escape(b->last,
++                                                            entry[i].name.data,
++                                                            entry[i].name.len);
++        } else {
++            b->last = ngx_cpymem(b->last, entry[i].name.data,
++                                 entry[i].name.len);
++        }
++
++        b->last = ngx_cpymem(b->last, "\",\"type\":\"",
++                             sizeof("\",\"type\":\"") - 1);
++
++        if (entry[i].dir) {
++            b->last = ngx_cpymem(b->last, "directory", sizeof("directory") - 1);
++
++        } else if (entry[i].file) {
++            b->last = ngx_cpymem(b->last, "file", sizeof("file") - 1);
++
++        } else {
++            b->last = ngx_cpymem(b->last, "other", sizeof("other") - 1);
++        }
++
++        b->last = ngx_cpymem(b->last, "\",\"mtime\":\"",
++                             sizeof("\",\"mtime\":\"") - 1);
++
++        b->last = ngx_http_time(b->last, entry[i].mtime);
++
++        if (entry[i].file) {
++            b->last = ngx_cpymem(b->last, "\",\"size\":",
++                                 sizeof("\",\"size\":") - 1);
++            b->last = ngx_sprintf(b->last, "%O", entry[i].size);
++
++        } else {
++            *b->last++ = '"';
++        }
++
++        *b->last++ = '}';
++    }
++
++    *b->last++ = ']';
++
++    b->last = ngx_cpymem(b->last, ngx_http_rokfoss_autoindex_tail,
++                         sizeof(ngx_http_rokfoss_autoindex_tail) - 1);
++
++    return b;
++}
++
++
+ static ngx_buf_t *
+ ngx_http_autoindex_html(ngx_http_request_t *r, ngx_array_t *entries)
+ {
