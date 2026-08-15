@@ -212,8 +212,14 @@ jobs:
           sudo cp -a "$PCRE_PREFIX" package-root/opt/pcre2
           sudo cp -a "$OPENSSL_PREFIX" package-root/opt/ssl3
 
-          ln -s /opt/openresty/nginx/sbin/nginx "package-root/usr/bin/$COMMAND_NAME"
-          test -L "package-root/usr/bin/$COMMAND_NAME"
+          install -m 0755 \
+            package-root/opt/openresty/nginx/sbin/nginx \
+            "package-root/usr/bin/$COMMAND_NAME"
+
+          test -f "package-root/usr/bin/$COMMAND_NAME"
+          test -x "package-root/usr/bin/$COMMAND_NAME"
+          test ! -L "package-root/usr/bin/$COMMAND_NAME"
+
           sudo chown -R "$(id -u):$(id -g)" package-root
 
       - name: DEB 패키지 생성
