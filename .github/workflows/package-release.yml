@@ -19,7 +19,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PACKAGE_NAME: openresty
+  PACKAGE_NAME: rs
+  COMMAND_NAME: rs
   JOBS: "3"
   PCRE_VER: "10.47"
   PCRE_PREFIX: /opt/pcre2
@@ -211,7 +212,8 @@ jobs:
           sudo cp -a "$PCRE_PREFIX" package-root/opt/pcre2
           sudo cp -a "$OPENSSL_PREFIX" package-root/opt/ssl3
 
-          ln -s /opt/openresty/nginx/sbin/nginx package-root/usr/bin/openresty
+          ln -s /opt/openresty/nginx/sbin/nginx "package-root/usr/bin/$COMMAND_NAME"
+          test -L "package-root/usr/bin/$COMMAND_NAME"
           sudo chown -R "$(id -u):$(id -g)" package-root
 
       - name: DEB 패키지 생성
