@@ -1,0 +1,293 @@
+name: Linux 패키지 릴리스
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: package-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PACKAGE_NAME: openresty
+  JOBS: "3"
+  PCRE_VER: "10.47"
+  PCRE_PREFIX: /opt/pcre2
+  PCRE_LIB: /opt/pcre2/lib
+  PCRE_INC: /opt/pcre2/include
+  OPENSSL_VER: "3.5.6"
+  OPENSSL_PATCH_VER: "3.5.5"
+  OPENSSL_PREFIX: /opt/ssl3
+  OPENSSL_LIB: /opt/ssl3/lib
+  OPENSSL_INC: /opt/ssl3/include
+  OPENRESTY_PREFIX: /opt/openresty
+
+jobs:
+  package:
+    name: ${{ matrix.goarch }} 패키지 빌드
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goarch: amd64
+            runner: ubuntu-22.04
+            debarch: amd64
+            rpmarch: x86_64
+            archarch: x86_64
+          - goarch: arm64
+            runner: ubuntu-22.04-arm
+            debarch: arm64
+            rpmarch: aarch64
+            archarch: aarch64
+
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 릴리스 버전 확인
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          SOURCE_VERSION="$(./util/ver)"
+
+          if [ "$VERSION" != "$SOURCE_VERSION" ]; then
+            echo "태그 버전($VERSION)과 OpenResty 소스 버전($SOURCE_VERSION)이 일치하지 않습니다."
+            exit 1
+          fi
+
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: 빌드 및 패키징 도구 설치
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            axel \
+            build-essential \
+            ca-certificates \
+            dos2unix \
+            git \
+            libarchive-tools \
+            libgd-dev \
+            libpcre3 \
+            libpcre3-dev \
+            libpq-dev \
+            mercurial \
+            patch \
+            perl \
+            rpm \
+            ruby-dev \
+            wget \
+            zlib1g-dev \
+            zstd
+          sudo gem install fpm --no-document
+
+      - name: 다운로드 캐시 준비
+        run: mkdir -p download-cache
+
+      - name: 소스 아카이브 캐시
+        uses: actions/cache@v4
+        with:
+          path: download-cache
+          key: package-release-${{ matrix.goarch }}-${{ env.PCRE_VER }}-${{ env.OPENSSL_VER }}-${{ hashFiles('util/mirror-tarballs') }}
+          restore-keys: |
+            package-release-${{ matrix.goarch }}-${{ env.PCRE_VER }}-${{ env.OPENSSL_VER }}-
+            package-release-${{ matrix.goarch }}-
+
+      - name: PCRE2 빌드
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ ! -f "download-cache/pcre2-$PCRE_VER.tar.gz" ]; then
+            wget -P download-cache "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${PCRE_VER}/pcre2-${PCRE_VER}.tar.gz"
+          fi
+
+          rm -rf "pcre2-$PCRE_VER"
+          tar zxf "download-cache/pcre2-$PCRE_VER.tar.gz"
+          cd "pcre2-$PCRE_VER"
+          ./configure \
+            --prefix="$PCRE_PREFIX" \
+            --enable-jit \
+            --enable-utf \
+            --enable-unicode-properties
+          make "-j$JOBS"
+          sudo env PATH="$PATH" make install
+
+      - name: OpenSSL 빌드
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ ! -f "download-cache/openssl-$OPENSSL_VER.tar.gz" ]; then
+            wget -P download-cache "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VER}/openssl-${OPENSSL_VER}.tar.gz"
+          fi
+
+          rm -rf "openssl-$OPENSSL_VER"
+          tar zxf "download-cache/openssl-$OPENSSL_VER.tar.gz"
+          cd "openssl-$OPENSSL_VER"
+          patch -p1 < "../patches/openssl-$OPENSSL_PATCH_VER-sess_set_get_cb_yield.patch"
+          ./config \
+            no-threads \
+            shared \
+            --libdir=lib \
+            --prefix="$OPENSSL_PREFIX"
+          make "-j$JOBS"
+          sudo make PATH="$PATH" install_sw
+
+      - name: OpenResty 빌드 및 설치
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo ln -sf /usr/bin/make /usr/bin/gmake
+          util/mirror-tarballs
+
+          cd "openresty-$(./util/ver)"
+          ./configure \
+            --with-http_v3_module \
+            --with-stream_realip_module \
+            --with-http_realip_module \
+            --prefix="$OPENRESTY_PREFIX" \
+            --with-cc-opt="-I$PCRE_INC -I$OPENSSL_INC" \
+            --with-ld-opt="-L$PCRE_LIB -L$OPENSSL_LIB -Wl,-rpath,$PCRE_LIB:$OPENSSL_LIB" \
+            --with-pcre-jit \
+            --with-http_ssl_module \
+            "-j$JOBS"
+          make "-j$JOBS"
+          sudo make install
+
+      - name: 빌드 결과 확인
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$OPENRESTY_PREFIX/bin:$OPENRESTY_PREFIX/nginx/sbin:$PATH"
+          openresty -V
+          openresty -t
+          ldd "$(command -v openresty)" | grep -E 'luajit|ssl|crypto|pcre' || true
+
+      - name: 패키지 루트 구성
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf package-root release
+          mkdir -p package-root/opt package-root/usr/bin release
+
+          sudo cp -a "$OPENRESTY_PREFIX" package-root/opt/openresty
+          sudo cp -a "$PCRE_PREFIX" package-root/opt/pcre2
+          sudo cp -a "$OPENSSL_PREFIX" package-root/opt/ssl3
+
+          ln -s /opt/openresty/nginx/sbin/nginx package-root/usr/bin/openresty
+          sudo chown -R "$(id -u):$(id -g)" package-root
+
+      - name: DEB 패키지 생성
+        shell: bash
+        run: |
+          set -euo pipefail
+          fpm \
+            -s dir \
+            -t deb \
+            -n "$PACKAGE_NAME" \
+            -v "$VERSION" \
+            --iteration 1 \
+            -a "${{ matrix.debarch }}" \
+            --license BSD \
+            --vendor "ROKFOSS PROJECT" \
+            --url "https://github.com/${GITHUB_REPOSITORY}" \
+            --description "ROKFOSS OpenResty build" \
+            -C package-root \
+            -p "release/${PACKAGE_NAME}_${VERSION}-1_${{ matrix.debarch }}.deb" \
+            .
+
+      - name: RPM 패키지 생성
+        shell: bash
+        run: |
+          set -euo pipefail
+          fpm \
+            -s dir \
+            -t rpm \
+            -n "$PACKAGE_NAME" \
+            -v "$VERSION" \
+            --iteration 1 \
+            -a "${{ matrix.rpmarch }}" \
+            --license BSD \
+            --vendor "ROKFOSS PROJECT" \
+            --url "https://github.com/${GITHUB_REPOSITORY}" \
+            --description "ROKFOSS OpenResty build" \
+            -C package-root \
+            -p "release/${PACKAGE_NAME}-${VERSION}-1.${{ matrix.rpmarch }}.rpm" \
+            .
+
+      - name: Arch Linux 패키지 생성
+        shell: bash
+        run: |
+          set -euo pipefail
+          fpm \
+            -s dir \
+            -t pacman \
+            -n "$PACKAGE_NAME" \
+            -v "$VERSION" \
+            --iteration 1 \
+            -a "${{ matrix.archarch }}" \
+            --license BSD \
+            --vendor "ROKFOSS PROJECT" \
+            --url "https://github.com/${GITHUB_REPOSITORY}" \
+            --description "ROKFOSS OpenResty build" \
+            -C package-root \
+            -p "release/${PACKAGE_NAME}-${VERSION}-1-${{ matrix.archarch }}.pkg.tar.zst" \
+            .
+
+      - name: 패키지 형식 확인
+        shell: bash
+        run: |
+          set -euo pipefail
+          dpkg-deb --info "release/${PACKAGE_NAME}_${VERSION}-1_${{ matrix.debarch }}.deb" >/dev/null
+          rpm -qpi "release/${PACKAGE_NAME}-${VERSION}-1.${{ matrix.rpmarch }}.rpm" >/dev/null
+          tar --zstd -tf "release/${PACKAGE_NAME}-${VERSION}-1-${{ matrix.archarch }}.pkg.tar.zst" >/dev/null
+          ls -lh release
+
+      - name: 패키지 아티팩트 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.goarch }}
+          path: release/*
+          if-no-files-found: error
+
+  release:
+    name: GitHub 릴리스 생성
+    needs: package
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: 패키지 아티팩트 다운로드
+        uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          path: release
+          merge-multiple: true
+
+      - name: 체크섬 생성
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release
+          sha256sum *.deb *.rpm *.pkg.tar.zst > checksums.txt
+          cat checksums.txt
+
+      - name: GitHub 릴리스 생성
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" \
+            release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --generate-notes
