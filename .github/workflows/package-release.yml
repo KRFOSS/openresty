@@ -196,7 +196,7 @@ jobs:
           set -euo pipefail
           export PATH="$OPENRESTY_PREFIX/bin:$OPENRESTY_PREFIX/nginx/sbin:$PATH"
           openresty -V
-          openresty -t
+          sudo "$OPENRESTY_PREFIX/nginx/sbin/nginx" -t
           ldd "$(command -v openresty)" | grep -E 'luajit|ssl|crypto|pcre' || true
 
       - name: 패키지 루트 구성
