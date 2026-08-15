@@ -1,33 +1,35 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-bs-theme="dark">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="dark light">
-<title>ROKFOSS Mirror</title>
+<meta charset="UTF-8" />
+<title>ROKFOSS PROJECT | 파일 디렉토리</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="icon" href="https://mirror.krfoss.org/favicon.ico" type="image/x-icon">
 <style>
 __CSS__
 </style>
 </head>
 <body>
-<header class="idx-top">
-<div class="idx-brand"><span class="idx-shield">ROKFOSS</span> Mirror</div>
-<nav class="idx-crumbs" id="idx-crumbs" aria-label="경로"></nav>
-</header>
-<main class="idx-main">
-<div class="idx-toolbar">
-<input type="search" id="idx-search" class="idx-search" placeholder="이 디렉터리에서 검색 (파일명 입력)" autocomplete="off" spellcheck="false" aria-label="파일 검색">
-<div class="idx-stats" id="idx-stats" role="status" aria-live="polite"></div>
+<a class="skip-link" href="#main-content">본문 바로가기</a>
+<nav class="navbar navbar-expand-lg sticky-top">
+<div class="container">
+<a class="navbar-brand" href="/">
+<img src="https://cdn.krfoss.org/web/ROKFOSS.png" alt="ROKFOSS 로고">
+</a>
+<div class="nav-links" aria-label="언어 선택">
+<a href="https://mirror.krfoss.org/index_en.html" class="menu-item" lang="en">EN</a>
+<a href="https://mirror.krfoss.org/index_ru.html" class="menu-item" lang="ru">RU</a>
+<a href="https://mirror.krfoss.org/index_jp.html" class="menu-item" lang="ja">JP</a>
+<a href="https://mirror.krfoss.org/" class="menu-item" lang="ko" aria-current="page">KR</a>
 </div>
-<div class="idx-head" role="row">
-<button class="idx-h idx-h-name" data-sort="name" type="button">이름</button>
-<button class="idx-h idx-h-size" data-sort="size" type="button">크기</button>
-<button class="idx-h idx-h-date" data-sort="mtime" type="button">수정일</button>
 </div>
-<div class="idx-viewport" id="idx-viewport" tabindex="0">
-<div class="idx-spacer" id="idx-spacer"></div>
-<div class="idx-rows" id="idx-rows"></div>
-</div>
-<div class="idx-empty" id="idx-empty" hidden>검색 결과가 없습니다.</div>
-</main>
+</nav>
+<div class="autoindex-container" id="main-content">
 <script id="idx-data" type="application/json">
