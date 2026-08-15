@@ -189,6 +189,10 @@ echo "$info_txt applying the ROKFOSS default logging and Korean CLI patch"
 patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_defaults.patch || exit 1
 echo
 
+echo "$info_txt applying the ROKFOSS drop_all and silent-drop patch"
+patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_drop.patch || exit 1
+echo
+
 #patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-redirect_memcpy_overlap.patch || exit 1
 
 echo "$info_txt applying the no_error_pages patch for nginx"
