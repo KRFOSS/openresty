@@ -39,7 +39,7 @@
 +        POST    $request_body;
 +    }
 +
-+    log_format custom escape=none '$custom_time | $remote_addr | $host | $geoip2_data_country_code | $geoip2_data_city | [$formatted_asn $geoip2_data_org] | $request_uri | $status | $http_user_agent | $request_method | $http_referer | $request_body_log | $server_protocol';
++    log_format custom escape=default '$custom_time | $remote_addr | $host | $geoip2_data_country_code | $geoip2_data_city | [$formatted_asn $geoip2_data_org] | $request_uri | $status | $http_user_agent | $request_method | $http_referer | $request_body_log | $server_protocol';
  
 -    #access_log  logs/access.log  main;
 +    access_log  logs/access.log  custom;
