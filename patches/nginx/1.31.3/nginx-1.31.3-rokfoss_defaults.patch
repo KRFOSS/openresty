@@ -48,7 +48,7 @@
      #tcp_nopush     on;
 --- a/src/core/nginx.c
 +++ b/src/core/nginx.c
-@@ -293,7 +293,7 @@ main(int argc, char *const *argv)
+@@ -293,10 +293,16 @@ main(int argc, char *const *argv)
      cycle = ngx_init_cycle(&init_cycle);
      if (cycle == NULL) {
          if (ngx_test_config) {
@@ -57,7 +57,16 @@
                             init_cycle.conf_file.data);
          }
  
-@@ -302,7 +302,7 @@ main(int argc, char *const *argv)
++        if (ngx_rokfoss_reload_test) {
++            ngx_log_stderr(0, "설정 파일 %s 검사에 \x1b[31m실패했습니다\x1b[0m. "
++                              "리로드를 \x1b[31m거부합니다\x1b[0m",
++                           init_cycle.conf_file.data);
++        }
++
+         return 1;
+     }
+ 
+@@ -302,7 +308,7 @@ main(int argc, char *const *argv)
  
      if (ngx_test_config) {
          if (!ngx_quiet_mode) {
@@ -66,7 +75,7 @@
                             cycle->conf_file.data);
          }
  
-@@ -311,7 +311,7 @@ main(int argc, char *const *argv)
+@@ -311,7 +317,7 @@ main(int argc, char *const *argv)
  
              for (i = 0; i < cycle->config_dump.nelts; i++) {
  
@@ -75,7 +84,22 @@
                  (void) ngx_write_fd(ngx_stdout, cd[i].name.data,
                                      cd[i].name.len);
                  ngx_write_stdout(":" NGX_LINEFEED);
-@@ -913,7 +913,7 @@ ngx_get_options(int argc, char *const *argv)
+@@ -326,8 +332,14 @@ main(int argc, char *const *argv)
+         return 0;
+     }
+ 
+     if (ngx_signal) {
++        if (ngx_rokfoss_reload_test && !ngx_quiet_mode) {
++            ngx_log_stderr(0, "설정 파일 %s 검사가 \x1b[32m성공했습니다\x1b[0m. "
++                              "리로드를 진행합니다",
++                           cycle->conf_file.data);
++        }
++
+         return ngx_signal_process(cycle, ngx_signal);
+     }
+ 
+     ngx_os_status(cycle->log);
+@@ -913,20 +925,25 @@ ngx_get_options(int argc, char *const *argv)
                      ngx_signal = argv[i];
  
                  } else {
@@ -84,7 +108,17 @@
                      return NGX_ERROR;
                  }
  
-@@ -926,7 +926,7 @@ ngx_get_options(int argc, char *const *argv)
+                 if (ngx_strcmp(ngx_signal, "stop") == 0
+                     || ngx_strcmp(ngx_signal, "quit") == 0
+                     || ngx_strcmp(ngx_signal, "reopen") == 0
+                     || ngx_strcmp(ngx_signal, "reload") == 0)
+                 {
+                     ngx_process = NGX_PROCESS_SIGNALLER;
++
++                    if (ngx_strcmp(ngx_signal, "reload") == 0) {
++                        ngx_rokfoss_reload_test = 1;
++                    }
++
                      goto next;
                  }
  
@@ -93,8 +127,26 @@
                  return NGX_ERROR;
  
              default:
+--- a/src/core/ngx_cycle.h
++++ b/src/core/ngx_cycle.h
+@@ -144,6 +144,7 @@
+ extern ngx_uint_t             ngx_test_config;
+ extern ngx_uint_t             ngx_dump_config;
+ extern ngx_uint_t             ngx_quiet_mode;
++extern ngx_uint_t             ngx_rokfoss_reload_test;
+ 
+ 
+ #endif /* _NGX_CYCLE_H_INCLUDED_ */
 --- a/src/core/ngx_cycle.c
 +++ b/src/core/ngx_cycle.c
+@@ -28,6 +28,7 @@
+ ngx_uint_t             ngx_test_config;
+ ngx_uint_t             ngx_dump_config;
+ ngx_uint_t             ngx_quiet_mode;
++ngx_uint_t             ngx_rokfoss_reload_test;
+ 
+ 
+ /* STUB NAME */
 @@ -289,7 +289,7 @@ ngx_init_cycle(ngx_cycle_t *old_cycle)
      }
  

@@ -2,7 +2,7 @@ diff --git a/src/ngx_http_lua_cache.c b/src/ngx_http_lua_cache.c
 index 5344246..3740a50 100644
 --- a/src/ngx_http_lua_cache.c
 +++ b/src/ngx_http_lua_cache.c
-@@ -348,6 +348,128 @@ error:
+@@ -348,6 +348,130 @@ error:
  }
  
  
@@ -50,7 +50,8 @@ index 5344246..3740a50 100644
 +    const char  *err;
 +    ngx_uint_t   saved_line;
 +
-+    if (!ngx_test_config) {
++    /* nginx -t 와 nginx -s reload 두 경로에서만 검사한다 */
++    if (!ngx_test_config && !ngx_rokfoss_reload_test) {
 +        return NGX_OK;
 +    }
 +
@@ -92,7 +93,8 @@ index 5344246..3740a50 100644
 +    lua_State   *L;
 +    const char  *err;
 +
-+    if (!ngx_test_config) {
++    /* nginx -t 와 nginx -s reload 두 경로에서만 검사한다 */
++    if (!ngx_test_config && !ngx_rokfoss_reload_test) {
 +        return NGX_OK;
 +    }
 +
@@ -131,7 +133,7 @@ index 5344246..3740a50 100644
  u_char *
  ngx_http_lua_gen_chunk_cache_key(ngx_conf_t *cf, const char *tag,
      const u_char *src, size_t src_len)
-@@ -355,6 +477,10 @@ ngx_http_lua_gen_chunk_cache_key(ngx_conf_t *cf, const char *tag,
+@@ -355,6 +479,10 @@ ngx_http_lua_gen_chunk_cache_key(ngx_conf_t *cf, const char *tag,
      u_char      *p, *out;
      size_t       tag_len;
  
@@ -142,7 +144,7 @@ index 5344246..3740a50 100644
      tag_len = ngx_strlen(tag);
  
      out = ngx_palloc(cf->pool, tag_len + NGX_HTTP_LUA_INLINE_KEY_LEN + 2);
-@@ -398,6 +524,10 @@ ngx_http_lua_gen_file_cache_key(ngx_conf_t *cf, const u_char *src,
+@@ -398,6 +526,10 @@ ngx_http_lua_gen_file_cache_key(ngx_conf_t *cf, const u_char *src,
  {
      u_char      *out;
  
