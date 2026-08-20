@@ -1,24 +1,24 @@
 --- a/src/http/ngx_http_request.h
 +++ b/src/http/ngx_http_request.h
-@@ -114,6 +114,12 @@
-
- #define NGX_HTTP_CLOSE                     444
+@@ -115,6 +115,12 @@
+ 
  #define NGX_HTTP_NGINX_CODES               494
-+
+ 
 +/*
 + * ROKFOSS: 응답 없이 끊은 요청을 로그에서 구분하기 위한 내부 상태값.
 + * 실제로 전송되는 상태 코드가 아니라 access log 에만 나타난다.
 + */
 +#define NGX_HTTP_ROKFOSS_DROP              999
-
++
  #define NGX_HTTP_REQUEST_HEADER_TOO_LARGE  494
-
+ 
+ #define NGX_HTTPS_CERT_ERROR               495
 --- a/src/http/ngx_http_special_response.c
 +++ b/src/http/ngx_http_special_response.c
-@@ -110,6 +110,29 @@ ngx_http_special_response_handler(ngx_http_request_t *r, ngx_int_t error)
-
+@@ -433,6 +433,29 @@
+ 
      r->err_status = error;
-
+ 
 +    /*
 +     * ROKFOSS: 비정상 입력에는 응답을 만들지 않고 연결만 끊는다.
 +     *
@@ -47,7 +47,7 @@
              case NGX_HTTP_BAD_REQUEST:
 --- a/src/http/ngx_http_core_module.h
 +++ b/src/http/ngx_http_core_module.h
-@@ -404,6 +404,7 @@ struct ngx_http_core_loc_conf_s {
+@@ -404,6 +404,7 @@
      ngx_flag_t    absolute_redirect;       /* absolute_redirect */
      ngx_flag_t    server_name_in_redirect; /* server_name_in_redirect */
      ngx_flag_t    port_in_redirect;        /* port_in_redirect */
@@ -57,12 +57,21 @@
      ngx_flag_t    log_not_found;           /* log_not_found */
 --- a/src/http/ngx_http_core_module.c
 +++ b/src/http/ngx_http_core_module.c
-@@ -609,6 +609,13 @@ static ngx_command_t  ngx_http_core_commands[] = {
-       offsetof(ngx_http_core_loc_conf_t, types_hash_max_size),
+@@ -30,6 +30,7 @@
+ 
+ static ngx_int_t ngx_http_core_preconfiguration(ngx_conf_t *cf);
+ static ngx_int_t ngx_http_core_postconfiguration(ngx_conf_t *cf);
++static ngx_int_t ngx_http_rokfoss_drop_handler(ngx_http_request_t *r);
+ static void *ngx_http_core_create_main_conf(ngx_conf_t *cf);
+ static char *ngx_http_core_init_main_conf(ngx_conf_t *cf, void *conf);
+ static void *ngx_http_core_create_srv_conf(ngx_conf_t *cf);
+@@ -607,6 +608,14 @@
+       offsetof(ngx_http_core_loc_conf_t, port_in_redirect),
        NULL },
-
+ 
 +    { ngx_string("drop_all"),
-+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
++      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF
++                        |NGX_HTTP_LIF_CONF|NGX_CONF_FLAG,
 +      ngx_conf_set_flag_slot,
 +      NGX_HTTP_LOC_CONF_OFFSET,
 +      offsetof(ngx_http_core_loc_conf_t, drop_all),
@@ -71,10 +80,10 @@
      { ngx_string("msie_padding"),
        NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
        ngx_conf_set_flag_slot,
-@@ -1011,6 +1018,25 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
-
+@@ -1002,6 +1011,25 @@
+ 
      ngx_http_update_location_config(r);
-
+ 
 +    /*
 +     * ROKFOSS: drop_all 이 켜진 곳으로 온 요청은 여기서 끝낸다.
 +     *
@@ -97,7 +106,66 @@
      ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                     "http cl:%O max:%O",
                     r->headers_in.content_length_n, clcf->client_max_body_size);
-@@ -3717,6 +3744,7 @@ ngx_http_core_create_loc_conf(ngx_conf_t *cf)
+@@ -3459,12 +3487,58 @@
+ static ngx_int_t
+ ngx_http_core_postconfiguration(ngx_conf_t *cf)
+ {
++    ngx_http_handler_pt        *h;
++    ngx_http_core_main_conf_t  *cmcf;
++
+     ngx_http_top_request_body_filter = ngx_http_request_body_save_filter;
+ 
++    /*
++     * ROKFOSS: drop_all 을 preaccess 단계에서도 검사한다.
++     *
++     * find_config 단계 검사는 if 평가 전에 돌기 때문에 if 안에 넣은 drop_all
++     * 은 못 본다. preaccess 는 rewrite/if 평가가 끝난 뒤라, if 가 matched 되어
++     * loc_conf 가 교체된 상태를 본다. 그래서 여기서 다시 확인하면
++     * "if (...) { drop_all on; }" 도 동작한다. 본문을 읽기 전이라 조기 종료.
++     */
++    cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
++
++    h = ngx_array_push(&cmcf->phases[NGX_HTTP_PREACCESS_PHASE].handlers);
++    if (h == NULL) {
++        return NGX_ERROR;
++    }
++
++    *h = ngx_http_rokfoss_drop_handler;
++
+     return NGX_OK;
+ }
+ 
+ 
++/*
++ * ROKFOSS: if 로 켜진 drop_all 을 처리하는 preaccess 핸들러.
++ * 반환한 NGX_HTTP_CLOSE 를 단계 엔진이 finalize 해 응답 없이 연결을 끊는다.
++ */
++static ngx_int_t
++ngx_http_rokfoss_drop_handler(ngx_http_request_t *r)
++{
++    ngx_http_core_loc_conf_t  *clcf;
++
++    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
++
++    if (!clcf->drop_all) {
++        return NGX_DECLINED;
++    }
++
++    ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
++                  "dropped by drop_all: \"%V?%V\"", &r->uri, &r->args);
++
++    r->err_status = NGX_HTTP_ROKFOSS_DROP;
++    r->keepalive = 0;
++    r->lingering_close = 0;
++
++    return NGX_HTTP_CLOSE;
++}
++
++
+ static void *
+ ngx_http_core_create_main_conf(ngx_conf_t *cf)
+ {
+@@ -3705,6 +3779,7 @@
      clcf->absolute_redirect = NGX_CONF_UNSET;
      clcf->server_name_in_redirect = NGX_CONF_UNSET;
      clcf->port_in_redirect = NGX_CONF_UNSET;
@@ -105,7 +173,7 @@
      clcf->msie_padding = NGX_CONF_UNSET;
      clcf->msie_refresh = NGX_CONF_UNSET;
      clcf->log_not_found = NGX_CONF_UNSET;
-@@ -3991,6 +4019,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
+@@ -3981,6 +4056,7 @@
      ngx_conf_merge_value(conf->server_name_in_redirect,
                                prev->server_name_in_redirect, 0);
      ngx_conf_merge_value(conf->port_in_redirect, prev->port_in_redirect, 1);
