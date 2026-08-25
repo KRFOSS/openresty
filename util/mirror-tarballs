@@ -6,7 +6,7 @@ root=`perl -MCwd -e'print Cwd::abs_path(shift)' $(dirname -- "$0")/..`
 
 . "$root/util/ver"
 name=openresty-$version
-ngx_lua_ver=0.10.32rc3
+ngx_lua_ver=0.10.32rc4
 ngx_lua_dir="$root/$name/bundle/ngx_lua-$ngx_lua_ver"
 patch_file="$root/patches/ngx_lua-$ngx_lua_ver-rokfoss-config-test.patch"
 info_txt=`perl -e 'print "\033[33m[INFO]\033[0m"'`
