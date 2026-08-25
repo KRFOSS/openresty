@@ -1,0 +1,251 @@
+diff --git a/src/ngx_http_lua_cache.c b/src/ngx_http_lua_cache.c
+index 5344246..3740a50 100644
+--- a/src/ngx_http_lua_cache.c
++++ b/src/ngx_http_lua_cache.c
+@@ -348,6 +348,130 @@ error:
+ }
+ 
+ 
++static ngx_uint_t
++ngx_http_lua_rokfoss_error_line(ngx_conf_t *cf, const char *err)
++{
++    u_char                    *p, *q;
++    ngx_int_t                  parsed;
++    ngx_http_lua_main_conf_t  *lmcf;
++
++    for (p = (u_char *) err; *p != '\0'; p++) {
++        if (*p != ':' || p[1] < '0' || p[1] > '9') {
++            continue;
++        }
++
++        for (q = p + 1; *q >= '0' && *q <= '9'; q++) {
++            /* void */
++        }
++
++        if (*q != ':') {
++            continue;
++        }
++
++        parsed = ngx_atoi(p + 1, q - (p + 1));
++        if (parsed <= 0) {
++            continue;
++        }
++
++        lmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_lua_module);
++        if (lmcf->directive_line > 0) {
++            return lmcf->directive_line + (ngx_uint_t) parsed - 1;
++        }
++    }
++
++    return cf->conf_file->line;
++}
++
++
++ngx_int_t
++ngx_http_lua_rokfoss_test_inline(ngx_conf_t *cf, const char *tag,
++    const u_char *src, size_t src_len)
++{
++    int          rc;
++    lua_State   *L;
++    const char  *err;
++    ngx_uint_t   saved_line;
++
++    /* nginx -t 와 nginx -s reload 두 경로에서만 검사한다 */
++    if (!ngx_test_config && !ngx_rokfoss_reload_test) {
++        return NGX_OK;
++    }
++
++    L = luaL_newstate();
++    if (L == NULL) {
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Lua 문법 검사용 VM을 초기화하지 못했습니다");
++        return NGX_ERROR;
++    }
++
++    luaL_openlibs(L);
++
++    rc = ngx_http_lua_clfactory_loadbuffer(L, (char *) src, src_len, tag);
++    if (rc != 0) {
++        err = lua_isstring(L, -1) ? lua_tostring(L, -1) : "unknown error";
++
++        saved_line = cf->conf_file->line;
++        cf->conf_file->line = ngx_http_lua_rokfoss_error_line(cf, err);
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Lua 문법 검사에 실패했습니다 (%s): %s",
++                           tag, err);
++        cf->conf_file->line = saved_line;
++
++        lua_close(L);
++        return NGX_ERROR;
++    }
++
++    lua_close(L);
++    return NGX_OK;
++}
++
++
++ngx_int_t
++ngx_http_lua_rokfoss_test_file(ngx_conf_t *cf, const u_char *src,
++    size_t src_len)
++{
++    int          rc;
++    u_char      *script;
++    lua_State   *L;
++    const char  *err;
++
++    /* nginx -t 와 nginx -s reload 두 경로에서만 검사한다 */
++    if (!ngx_test_config && !ngx_rokfoss_reload_test) {
++        return NGX_OK;
++    }
++
++    script = ngx_http_lua_rebase_path(cf->pool, (u_char *) src, src_len);
++    if (script == NULL) {
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Lua 파일 경로를 확인하지 못했습니다");
++        return NGX_ERROR;
++    }
++
++    L = luaL_newstate();
++    if (L == NULL) {
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Lua 파일 검사용 VM을 초기화하지 못했습니다");
++        return NGX_ERROR;
++    }
++
++    luaL_openlibs(L);
++
++    rc = ngx_http_lua_clfactory_loadfile(L, (char *) script);
++    if (rc != 0) {
++        err = lua_isstring(L, -1) ? lua_tostring(L, -1) : "unknown error";
++
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Lua 파일 검사에 실패했습니다 (\"%s\"): %s",
++                           script, err);
++        lua_close(L);
++        return NGX_ERROR;
++    }
++
++    lua_close(L);
++    return NGX_OK;
++}
++
++
+ u_char *
+ ngx_http_lua_gen_chunk_cache_key(ngx_conf_t *cf, const char *tag,
+     const u_char *src, size_t src_len)
+@@ -355,6 +479,10 @@ ngx_http_lua_gen_chunk_cache_key(ngx_conf_t *cf, const char *tag,
+     u_char      *p, *out;
+     size_t       tag_len;
+ 
++    if (ngx_http_lua_rokfoss_test_inline(cf, tag, src, src_len) != NGX_OK) {
++        return NULL;
++    }
++
+     tag_len = ngx_strlen(tag);
+ 
+     out = ngx_palloc(cf->pool, tag_len + NGX_HTTP_LUA_INLINE_KEY_LEN + 2);
+@@ -398,6 +526,10 @@ ngx_http_lua_gen_file_cache_key(ngx_conf_t *cf, const u_char *src,
+ {
+     u_char      *out;
+ 
++    if (ngx_http_lua_rokfoss_test_file(cf, src, src_len) != NGX_OK) {
++        return NULL;
++    }
++
+     out = ngx_palloc(cf->pool, NGX_HTTP_LUA_FILE_KEY_LEN + 1);
+     if (out == NULL) {
+         return NULL;
+diff --git a/src/ngx_http_lua_cache.h b/src/ngx_http_lua_cache.h
+index 9535279..414e93b 100644
+--- a/src/ngx_http_lua_cache.h
++++ b/src/ngx_http_lua_cache.h
+@@ -17,6 +17,10 @@ ngx_int_t ngx_http_lua_cache_loadbuffer(ngx_log_t *log, lua_State *L,
+     const char *name);
+ ngx_int_t ngx_http_lua_cache_loadfile(ngx_log_t *log, lua_State *L,
+     const u_char *script, int *cache_ref, const u_char *cache_key);
++ngx_int_t ngx_http_lua_rokfoss_test_inline(ngx_conf_t *cf, const char *tag,
++    const u_char *src, size_t src_len);
++ngx_int_t ngx_http_lua_rokfoss_test_file(ngx_conf_t *cf, const u_char *src,
++    size_t src_len);
+ u_char *ngx_http_lua_gen_chunk_cache_key(ngx_conf_t *cf, const char *tag,
+     const u_char *src, size_t src_len);
+ u_char *ngx_http_lua_gen_file_cache_key(ngx_conf_t *cf, const u_char *src,
+diff --git a/src/ngx_http_lua_directive.c b/src/ngx_http_lua_directive.c
+index 784835f..ce43bcf 100644
+--- a/src/ngx_http_lua_directive.c
++++ b/src/ngx_http_lua_directive.c
+@@ -1367,6 +1367,11 @@ ngx_http_lua_init_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     lmcf->init_handler = (ngx_http_lua_main_conf_handler_pt) cmd->post;
+ 
+     if (cmd->post == ngx_http_lua_init_by_file) {
++        if (ngx_http_lua_rokfoss_test_file(cf, value[1].data,
++                                           value[1].len) != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
+         name = ngx_http_lua_rebase_path(cf->pool, value[1].data,
+                                         value[1].len);
+         if (name == NULL) {
+@@ -1377,6 +1382,12 @@ ngx_http_lua_init_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+         lmcf->init_src.len = ngx_strlen(name);
+ 
+     } else {
++        if (ngx_http_lua_rokfoss_test_inline(cf, "init_by_lua",
++                                             value[1].data, value[1].len)
++            != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
+         lmcf->init_src = value[1];
+ 
+         chunkname = ngx_http_lua_gen_chunk_name(cf, "init_by_lua",
+@@ -1438,6 +1449,11 @@ ngx_http_lua_init_worker_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     lmcf->init_worker_handler = (ngx_http_lua_main_conf_handler_pt) cmd->post;
+ 
+     if (cmd->post == ngx_http_lua_init_worker_by_file) {
++        if (ngx_http_lua_rokfoss_test_file(cf, value[1].data,
++                                           value[1].len) != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
+         name = ngx_http_lua_rebase_path(cf->pool, value[1].data,
+                                         value[1].len);
+         if (name == NULL) {
+@@ -1448,6 +1464,12 @@ ngx_http_lua_init_worker_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+         lmcf->init_worker_src.len = ngx_strlen(name);
+ 
+     } else {
++        if (ngx_http_lua_rokfoss_test_inline(cf, "init_worker_by_lua",
++                                             value[1].data, value[1].len)
++            != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
+         lmcf->init_worker_src = value[1];
+ 
+         chunkname = ngx_http_lua_gen_chunk_name(cf, "init_worker_by_lua",
+@@ -1506,6 +1528,11 @@ ngx_http_lua_exit_worker_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     lmcf->exit_worker_handler = (ngx_http_lua_main_conf_handler_pt) cmd->post;
+ 
+     if (cmd->post == ngx_http_lua_exit_worker_by_file) {
++        if (ngx_http_lua_rokfoss_test_file(cf, value[1].data,
++                                           value[1].len) != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
+         name = ngx_http_lua_rebase_path(cf->pool, value[1].data,
+                                         value[1].len);
+         if (name == NULL) {
+@@ -1516,6 +1543,12 @@ ngx_http_lua_exit_worker_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+         lmcf->exit_worker_src.len = ngx_strlen(name);
+ 
+     } else {
++        if (ngx_http_lua_rokfoss_test_inline(cf, "exit_worker_by_lua",
++                                             value[1].data, value[1].len)
++            != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
+         lmcf->exit_worker_src = value[1];
+ 
+         chunkname = ngx_http_lua_gen_chunk_name(cf, "exit_worker_by_lua",
