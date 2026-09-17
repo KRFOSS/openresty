@@ -288,4 +288,121 @@ CONF
     );
 }
 
+
+{
+    my ($exit, $stdout, $stderr, $dir) = run_config_test(
+        $base . <<'CONF'
+http {
+    server {
+        listen 127.0.0.1:19006;
+        location / {
+            access_by_lua '
+                local ok = true
+                local broken = @
+                local after = true
+            ';
+            return 204;
+        }
+    }
+}
+CONF
+    );
+
+    my $conf = File::Spec->catfile($dir, 'nginx.conf');
+
+    isnt $exit, 0, 'invalid legacy string Lua fails openresty -t';
+    like(
+        $stderr,
+        qr/\Q$conf\E:11(?:\D|$)/,
+        'legacy string Lua error is mapped to the actual nginx configuration line'
+    );
+    unlike(
+        $stderr,
+        qr/\Q$conf\E:13(?:\D|$)/,
+        'legacy string Lua error does not point at the closing quoted directive'
+    );
+}
+
+
+{
+    my ($exit, $stdout, $stderr) = run_config_test(
+        $base . <<'CONF'
+stream {
+    server {
+        listen 127.0.0.1:19001;
+        content_by_lua_block {
+            local ok = true
+        }
+    }
+}
+CONF
+    );
+
+    is $exit, 0, 'valid Stream Lua passes openresty -t';
+}
+
+{
+    my ($exit, $stdout, $stderr) = run_config_test(
+        $base . <<'CONF'
+stream {
+    server {
+        listen 127.0.0.1:19002;
+        content_by_lua_block {
+            local broken =
+        }
+    }
+}
+CONF
+    );
+
+    isnt $exit, 0, 'invalid Stream Lua content fails openresty -t';
+    like $stderr, qr/Stream Lua/, 'Stream Lua syntax error is reported';
+}
+
+{
+    my ($exit, $stdout, $stderr) = run_config_test(
+        $base . <<'CONF'
+stream {
+    init_by_lua_block {
+        local broken =
+    }
+}
+CONF
+    );
+
+    isnt $exit, 0, 'invalid Stream Lua init fails openresty -t';
+    like $stderr, qr/Stream Lua/, 'Stream Lua init syntax error is reported';
+}
+
+{
+    my ($exit, $stdout, $stderr) = run_config_test(
+        $base . <<'CONF'
+stream {
+    server {
+        listen 127.0.0.1:19003;
+        content_by_lua_file missing-stream.lua;
+    }
+}
+CONF
+    );
+
+    isnt $exit, 0, 'missing static Stream Lua file fails openresty -t';
+    like $stderr, qr/Stream Lua/, 'missing Stream Lua file is reported';
+}
+
+{
+    my ($exit, $stdout, $stderr) = run_config_test(
+        $base . <<'CONF'
+stream {
+    server {
+        listen 127.0.0.1:19004;
+        content_by_lua_file scripts/$remote_addr.lua;
+    }
+}
+CONF
+    );
+
+    is $exit, 0, 'dynamic Stream Lua file path is not opened during config test';
+}
+
 done_testing();

@@ -178,4 +178,26 @@ CONF
     unlike $stderr, qr/Lua/, 'the Lua check does not run for other signals';
 }
 
+
+{
+    my ($exit, $stdout, $stderr, $delivered) = run_signal_test(
+        $base . <<'CONF',
+stream {
+    server {
+        listen 127.0.0.1:19005;
+        content_by_lua_block {
+            local broken =
+        }
+    }
+}
+CONF
+        'reload',
+    );
+
+    isnt $exit, 0, 'a Stream Lua syntax error refuses the reload';
+    ok !$delivered, 'no reload signal is sent when the Stream Lua check fails';
+    like $stderr, qr/Stream Lua/, 'the Stream Lua syntax error is reported';
+    like $stderr, qr/거부/, 'the Stream Lua reload refusal is reported';
+}
+
 done_testing();

@@ -1,17 +1,35 @@
 diff --git a/src/ngx_http_lua_cache.c b/src/ngx_http_lua_cache.c
-index 5344246..3740a50 100644
+index 5344246..b169526 100644
 --- a/src/ngx_http_lua_cache.c
 +++ b/src/ngx_http_lua_cache.c
-@@ -348,6 +348,130 @@ error:
+@@ -348,6 +348,145 @@ error:
  }
  
  
 +static ngx_uint_t
-+ngx_http_lua_rokfoss_error_line(ngx_conf_t *cf, const char *err)
++ngx_http_lua_rokfoss_error_line(ngx_conf_t *cf, const char *err,
++    const u_char *src, size_t src_len)
 +{
 +    u_char                    *p, *q;
++    size_t                     i;
 +    ngx_int_t                  parsed;
++    ngx_uint_t                 start_line;
 +    ngx_http_lua_main_conf_t  *lmcf;
++
++    lmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_lua_module);
++
++    if (lmcf->directive_line > 0) {
++        start_line = lmcf->directive_line;
++
++    } else {
++        start_line = cf->conf_file->line;
++
++        for (i = 0; i < src_len && start_line > 1; i++) {
++            if (src[i] == '\n') {
++                start_line--;
++            }
++        }
++    }
 +
 +    for (p = (u_char *) err; *p != '\0'; p++) {
 +        if (*p != ':' || p[1] < '0' || p[1] > '9') {
@@ -31,15 +49,11 @@ index 5344246..3740a50 100644
 +            continue;
 +        }
 +
-+        lmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_lua_module);
-+        if (lmcf->directive_line > 0) {
-+            return lmcf->directive_line + (ngx_uint_t) parsed - 1;
-+        }
++        return start_line + (ngx_uint_t) parsed - 1;
 +    }
 +
 +    return cf->conf_file->line;
 +}
-+
 +
 +ngx_int_t
 +ngx_http_lua_rokfoss_test_inline(ngx_conf_t *cf, const char *tag,
@@ -69,7 +83,8 @@ index 5344246..3740a50 100644
 +        err = lua_isstring(L, -1) ? lua_tostring(L, -1) : "unknown error";
 +
 +        saved_line = cf->conf_file->line;
-+        cf->conf_file->line = ngx_http_lua_rokfoss_error_line(cf, err);
++        cf->conf_file->line =
++            ngx_http_lua_rokfoss_error_line(cf, err, src, src_len);
 +        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
 +                           "Lua 문법 검사에 실패했습니다 (%s): %s",
 +                           tag, err);
@@ -133,7 +148,7 @@ index 5344246..3740a50 100644
  u_char *
  ngx_http_lua_gen_chunk_cache_key(ngx_conf_t *cf, const char *tag,
      const u_char *src, size_t src_len)
-@@ -355,6 +479,10 @@ ngx_http_lua_gen_chunk_cache_key(ngx_conf_t *cf, const char *tag,
+@@ -355,6 +494,10 @@ ngx_http_lua_gen_chunk_cache_key(ngx_conf_t *cf, const char *tag,
      u_char      *p, *out;
      size_t       tag_len;
  
@@ -144,7 +159,7 @@ index 5344246..3740a50 100644
      tag_len = ngx_strlen(tag);
  
      out = ngx_palloc(cf->pool, tag_len + NGX_HTTP_LUA_INLINE_KEY_LEN + 2);
-@@ -398,6 +526,10 @@ ngx_http_lua_gen_file_cache_key(ngx_conf_t *cf, const u_char *src,
+@@ -398,6 +541,10 @@ ngx_http_lua_gen_file_cache_key(ngx_conf_t *cf, const u_char *src,
  {
      u_char      *out;
  

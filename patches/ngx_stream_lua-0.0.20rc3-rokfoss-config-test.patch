@@ -1,0 +1,402 @@
+diff --git a/src/ngx_stream_lua_balancer.c b/src/ngx_stream_lua_balancer.c
+index 38e11cc..e4bf37f 100644
+--- a/src/ngx_stream_lua_balancer.c
++++ b/src/ngx_stream_lua_balancer.c
+@@ -163,6 +163,12 @@ ngx_stream_lua_balancer_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     if (cmd->post == ngx_stream_lua_balancer_handler_file) {
+         /* Lua code in an external file */
+ 
++        if (ngx_stream_lua_rokfoss_test_file(cf, value[1].data,
++                                             value[1].len) != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         name = ngx_stream_lua_rebase_path(cf->pool, value[1].data,
+                                           value[1].len);
+         if (name == NULL) {
+@@ -187,6 +193,13 @@ ngx_stream_lua_balancer_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     } else {
+         /* inlined Lua code */
+ 
++        if (ngx_stream_lua_rokfoss_test_inline(cf, "balancer_by_lua",
++                                               value[1].data, value[1].len)
++            != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         lscf->balancer.src = value[1];
+ 
+         p = ngx_palloc(cf->pool,
+diff --git a/src/ngx_stream_lua_cache.c b/src/ngx_stream_lua_cache.c
+index 4c57137..54b8b7c 100644
+--- a/src/ngx_stream_lua_cache.c
++++ b/src/ngx_stream_lua_cache.c
+@@ -153,6 +153,88 @@ ngx_stream_lua_cache_store_code(lua_State *L, const char *key)
+ }
+ 
+ 
++ngx_int_t
++ngx_stream_lua_rokfoss_test_inline(ngx_conf_t *cf, const char *tag,
++    const u_char *src, size_t src_len)
++{
++    int          rc;
++    lua_State   *L;
++    const char  *err;
++
++    /* nginx -t 와 nginx -s reload 두 경로에서만 검사한다 */
++    if (!ngx_test_config && !ngx_rokfoss_reload_test) {
++        return NGX_OK;
++    }
++
++    L = luaL_newstate();
++    if (L == NULL) {
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Stream Lua 문법 검사용 VM을 초기화하지 못했습니다");
++        return NGX_ERROR;
++    }
++
++    luaL_openlibs(L);
++
++    rc = ngx_stream_lua_clfactory_loadbuffer(L, (char *) src, src_len, tag);
++    if (rc != 0) {
++        err = lua_isstring(L, -1) ? lua_tostring(L, -1) : "unknown error";
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Stream Lua 문법 검사에 실패했습니다 (%s): %s",
++                           tag, err);
++        lua_close(L);
++        return NGX_ERROR;
++    }
++
++    lua_close(L);
++    return NGX_OK;
++}
++
++
++ngx_int_t
++ngx_stream_lua_rokfoss_test_file(ngx_conf_t *cf, const u_char *src,
++    size_t src_len)
++{
++    int          rc;
++    u_char      *script;
++    lua_State   *L;
++    const char  *err;
++
++    /* nginx -t 와 nginx -s reload 두 경로에서만 검사한다 */
++    if (!ngx_test_config && !ngx_rokfoss_reload_test) {
++        return NGX_OK;
++    }
++
++    script = ngx_stream_lua_rebase_path(cf->pool, (u_char *) src, src_len);
++    if (script == NULL) {
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Stream Lua 파일 경로를 확인하지 못했습니다");
++        return NGX_ERROR;
++    }
++
++    L = luaL_newstate();
++    if (L == NULL) {
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Stream Lua 파일 검사용 VM을 초기화하지 못했습니다");
++        return NGX_ERROR;
++    }
++
++    luaL_openlibs(L);
++
++    rc = ngx_stream_lua_clfactory_loadfile(L, (char *) script);
++    if (rc != 0) {
++        err = lua_isstring(L, -1) ? lua_tostring(L, -1) : "unknown error";
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "Stream Lua 파일 검사에 실패했습니다 (\"%s\"): %s",
++                           script, err);
++        lua_close(L);
++        return NGX_ERROR;
++    }
++
++    lua_close(L);
++    return NGX_OK;
++}
++
++
+ ngx_int_t
+ ngx_stream_lua_cache_loadbuffer(ngx_log_t *log, lua_State *L,
+     const u_char *src, size_t src_len, const u_char *cache_key,
+diff --git a/src/ngx_stream_lua_cache.h b/src/ngx_stream_lua_cache.h
+index 5c3c73b..4350e53 100644
+--- a/src/ngx_stream_lua_cache.h
++++ b/src/ngx_stream_lua_cache.h
+@@ -25,6 +25,10 @@ ngx_int_t ngx_stream_lua_cache_loadbuffer(ngx_log_t *log, lua_State *L,
+     const char *name);
+ ngx_int_t ngx_stream_lua_cache_loadfile(ngx_log_t *log, lua_State *L,
+     const u_char *script, const u_char *cache_key);
++ngx_int_t ngx_stream_lua_rokfoss_test_inline(ngx_conf_t *cf, const char *tag,
++    const u_char *src, size_t src_len);
++ngx_int_t ngx_stream_lua_rokfoss_test_file(ngx_conf_t *cf, const u_char *src,
++    size_t src_len);
+ 
+ 
+ #endif /* _NGX_STREAM_LUA_CACHE_H_INCLUDED_ */
+diff --git a/src/ngx_stream_lua_directive.c b/src/ngx_stream_lua_directive.c
+index 61519e9..2692b06 100644
+--- a/src/ngx_stream_lua_directive.c
++++ b/src/ngx_stream_lua_directive.c
+@@ -286,6 +286,13 @@ ngx_stream_lua_preread_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+     }
+ 
+     if (cmd->post == ngx_stream_lua_preread_handler_inline) {
++        if (ngx_stream_lua_rokfoss_test_inline(cf, "preread_by_lua",
++                                               value[1].data, value[1].len)
++            != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         chunkname = ngx_stream_lua_gen_chunk_name(cf, "preread_by_lua",
+                                                   sizeof("preread_by_lua") - 1,
+                                                   &chunkname_len);
+@@ -325,6 +332,12 @@ ngx_stream_lua_preread_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ 
+         if (lscf->preread_src.lengths == NULL) {
+             /* no variable found */
++            if (ngx_stream_lua_rokfoss_test_file(cf, value[1].data,
++                                                 value[1].len) != NGX_OK)
++            {
++                return NGX_CONF_ERROR;
++            }
++
+             p = ngx_palloc(cf->pool, NGX_STREAM_LUA_FILE_KEY_LEN + 1);
+             if (p == NULL) {
+                 return NGX_CONF_ERROR;
+@@ -407,6 +420,13 @@ ngx_stream_lua_content_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+     }
+ 
+     if (cmd->post == ngx_stream_lua_content_handler_inline) {
++        if (ngx_stream_lua_rokfoss_test_inline(cf, "content_by_lua",
++                                               value[1].data, value[1].len)
++            != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         chunkname = ngx_stream_lua_gen_chunk_name(cf, "content_by_lua",
+                                                   sizeof("content_by_lua") - 1,
+                                                   &chunkname_len);
+@@ -449,6 +469,12 @@ ngx_stream_lua_content_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ 
+         if (llcf->content_src.lengths == NULL) {
+             /* no variable found */
++            if (ngx_stream_lua_rokfoss_test_file(cf, value[1].data,
++                                                 value[1].len) != NGX_OK)
++            {
++                return NGX_CONF_ERROR;
++            }
++
+             p = ngx_palloc(cf->pool, NGX_STREAM_LUA_FILE_KEY_LEN + 1);
+             if (p == NULL) {
+                 return NGX_CONF_ERROR;
+@@ -529,6 +555,13 @@ ngx_stream_lua_log_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+     }
+ 
+     if (cmd->post == ngx_stream_lua_log_handler_inline) {
++        if (ngx_stream_lua_rokfoss_test_inline(cf, "log_by_lua",
++                                               value[1].data, value[1].len)
++            != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         chunkname = ngx_stream_lua_gen_chunk_name(cf, "log_by_lua",
+                                                   sizeof("log_by_lua") - 1,
+                                                   &chunkname_len);
+@@ -568,6 +601,12 @@ ngx_stream_lua_log_by_lua(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ 
+         if (llcf->log_src.lengths == NULL) {
+             /* no variable found */
++            if (ngx_stream_lua_rokfoss_test_file(cf, value[1].data,
++                                                 value[1].len) != NGX_OK)
++            {
++                return NGX_CONF_ERROR;
++            }
++
+             p = ngx_palloc(cf->pool, NGX_STREAM_LUA_FILE_KEY_LEN + 1);
+             if (p == NULL) {
+                 return NGX_CONF_ERROR;
+@@ -642,6 +681,12 @@ ngx_stream_lua_init_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     lmcf->init_handler = (ngx_stream_lua_main_conf_handler_pt) cmd->post;
+ 
+     if (cmd->post == ngx_stream_lua_init_by_file) {
++        if (ngx_stream_lua_rokfoss_test_file(cf, value[1].data,
++                                             value[1].len) != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         name = ngx_stream_lua_rebase_path(cf->pool, value[1].data,
+                                           value[1].len);
+         if (name == NULL) {
+@@ -652,6 +697,13 @@ ngx_stream_lua_init_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+         lmcf->init_src.len = ngx_strlen(name);
+ 
+     } else {
++        if (ngx_stream_lua_rokfoss_test_inline(cf, "init_by_lua",
++                                               value[1].data, value[1].len)
++            != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         lmcf->init_src = value[1];
+     }
+ 
+@@ -703,6 +755,12 @@ ngx_stream_lua_init_worker_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     lmcf->init_worker_handler = (ngx_stream_lua_main_conf_handler_pt) cmd->post;
+ 
+     if (cmd->post == ngx_stream_lua_init_worker_by_file) {
++        if (ngx_stream_lua_rokfoss_test_file(cf, value[1].data,
++                                             value[1].len) != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         name = ngx_stream_lua_rebase_path(cf->pool, value[1].data,
+                                           value[1].len);
+         if (name == NULL) {
+@@ -713,6 +771,13 @@ ngx_stream_lua_init_worker_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+         lmcf->init_worker_src.len = ngx_strlen(name);
+ 
+     } else {
++        if (ngx_stream_lua_rokfoss_test_inline(cf, "init_worker_by_lua",
++                                               value[1].data, value[1].len)
++            != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         lmcf->init_worker_src = value[1];
+     }
+ 
+diff --git a/src/ngx_stream_lua_proxy_ssl_certby.c b/src/ngx_stream_lua_proxy_ssl_certby.c
+index cbeace8..607a15a 100644
+--- a/src/ngx_stream_lua_proxy_ssl_certby.c
++++ b/src/ngx_stream_lua_proxy_ssl_certby.c
+@@ -153,6 +153,12 @@ ngx_stream_lua_proxy_ssl_cert_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     if (cmd->post == ngx_stream_lua_proxy_ssl_cert_handler_file) {
+         /* Lua code in an external file */
+ 
++        if (ngx_stream_lua_rokfoss_test_file(cf, value[1].data,
++                                             value[1].len) != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         name = ngx_stream_lua_rebase_path(cf->pool, value[1].data,
+                                           value[1].len);
+         if (name == NULL) {
+@@ -176,6 +182,13 @@ ngx_stream_lua_proxy_ssl_cert_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     } else {
+         /* inlined Lua code */
+ 
++        if (ngx_stream_lua_rokfoss_test_inline(cf, "proxy_ssl_certificate_by_lua",
++                                               value[1].data, value[1].len)
++            != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         lscf->ups.proxy_ssl_cert_src = value[1];
+ 
+         p = ngx_palloc(cf->pool,
+diff --git a/src/ngx_stream_lua_proxy_ssl_verifyby.c b/src/ngx_stream_lua_proxy_ssl_verifyby.c
+index 1df1348..d482c2c 100644
+--- a/src/ngx_stream_lua_proxy_ssl_verifyby.c
++++ b/src/ngx_stream_lua_proxy_ssl_verifyby.c
+@@ -166,6 +166,12 @@ ngx_stream_lua_proxy_ssl_verify_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     if (cmd->post == ngx_stream_lua_proxy_ssl_verify_handler_file) {
+         /* Lua code in an external file */
+ 
++        if (ngx_stream_lua_rokfoss_test_file(cf, value[1].data,
++                                             value[1].len) != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         name = ngx_stream_lua_rebase_path(cf->pool, value[1].data,
+                                           value[1].len);
+         if (name == NULL) {
+@@ -189,6 +195,13 @@ ngx_stream_lua_proxy_ssl_verify_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     } else {
+         /* inlined Lua code */
+ 
++        if (ngx_stream_lua_rokfoss_test_inline(cf, "proxy_ssl_verify_by_lua",
++                                               value[1].data, value[1].len)
++            != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         lscf->ups.proxy_ssl_verify_src = value[1];
+ 
+         p = ngx_palloc(cf->pool,
+diff --git a/src/ngx_stream_lua_ssl_certby.c b/src/ngx_stream_lua_ssl_certby.c
+index a5cdca5..42091c4 100644
+--- a/src/ngx_stream_lua_ssl_certby.c
++++ b/src/ngx_stream_lua_ssl_certby.c
+@@ -151,6 +151,12 @@ ngx_stream_lua_ssl_cert_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     if (cmd->post == ngx_stream_lua_ssl_cert_handler_file) {
+         /* Lua code in an external file */
+ 
++        if (ngx_stream_lua_rokfoss_test_file(cf, value[1].data,
++                                             value[1].len) != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         name = ngx_stream_lua_rebase_path(cf->pool, value[1].data,
+                                           value[1].len);
+         if (name == NULL) {
+@@ -174,6 +180,13 @@ ngx_stream_lua_ssl_cert_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     } else {
+         /* inlined Lua code */
+ 
++        if (ngx_stream_lua_rokfoss_test_inline(cf, "ssl_certificate_by_lua",
++                                               value[1].data, value[1].len)
++            != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         lscf->srv.ssl_cert_src = value[1];
+ 
+         p = ngx_palloc(cf->pool,
+diff --git a/src/ngx_stream_lua_ssl_client_helloby.c b/src/ngx_stream_lua_ssl_client_helloby.c
+index 236dcb4..bfb235f 100644
+--- a/src/ngx_stream_lua_ssl_client_helloby.c
++++ b/src/ngx_stream_lua_ssl_client_helloby.c
+@@ -130,6 +130,12 @@ ngx_stream_lua_ssl_client_hello_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     if (cmd->post == ngx_stream_lua_ssl_client_hello_handler_file) {
+         /* Lua code in an external file */
+ 
++        if (ngx_stream_lua_rokfoss_test_file(cf, value[1].data,
++                                             value[1].len) != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         name = ngx_stream_lua_rebase_path(cf->pool, value[1].data,
+                                           value[1].len);
+         if (name == NULL) {
+@@ -153,6 +159,13 @@ ngx_stream_lua_ssl_client_hello_by_lua(ngx_conf_t *cf, ngx_command_t *cmd,
+     } else {
+         /* inlined Lua code */
+ 
++        if (ngx_stream_lua_rokfoss_test_inline(cf, "ssl_client_hello_by_lua",
++                                               value[1].data, value[1].len)
++            != NGX_OK)
++        {
++            return NGX_CONF_ERROR;
++        }
++
+         lscf->srv.ssl_client_hello_src = value[1];
+ 
+         p = ngx_palloc(cf->pool,

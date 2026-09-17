@@ -9,6 +9,9 @@ name=openresty-$version
 ngx_lua_ver=0.10.32rc5
 ngx_lua_dir="$root/$name/bundle/ngx_lua-$ngx_lua_ver"
 patch_file="$root/patches/ngx_lua-$ngx_lua_ver-rokfoss-config-test.patch"
+ngx_stream_lua_ver=0.0.20rc3
+ngx_stream_lua_dir="$root/$name/bundle/ngx_stream_lua-$ngx_stream_lua_ver"
+stream_patch_file="$root/patches/ngx_stream_lua-$ngx_stream_lua_ver-rokfoss-config-test.patch"
 info_txt=`perl -e 'print "\033[33m[INFO]\033[0m"'`
 
 if [ ! -d "$ngx_lua_dir" ]; then
@@ -21,15 +24,31 @@ if [ ! -f "$patch_file" ]; then
     exit 1
 fi
 
+if [ ! -d "$ngx_stream_lua_dir" ]; then
+    echo "ROKFOSS Stream Lua config test: ngx_stream_lua source directory not found: $ngx_stream_lua_dir" >&2
+    exit 1
+fi
+
+if [ ! -f "$stream_patch_file" ]; then
+    echo "ROKFOSS Stream Lua config test: patch file not found: $stream_patch_file" >&2
+    exit 1
+fi
+
 echo "$info_txt applying the ROKFOSS Lua config test patch"
 cd "$ngx_lua_dir" || exit 1
 patch -p1 < "$patch_file" || exit 1
 cd "$root" || exit 1
 echo
 
+echo "$info_txt applying the ROKFOSS Stream Lua config test patch"
+cd "$ngx_stream_lua_dir" || exit 1
+patch -p1 < "$stream_patch_file" || exit 1
+cd "$root" || exit 1
+echo
+
 # mirror-tarballs-core already created the release archive. Rebuild it after
-# applying the ROKFOSS ngx_lua patch so both the source tree and tarball carry
-# exactly the same patched sources.
+# applying the ROKFOSS Lua config test patches so both the source tree and
+# tarball carry exactly the same patched sources.
 rm -f "$name.tar" "$name.tar.gz" || exit 1
 tar cf "$name.tar" "$name" || exit 1
 if command -v pigz > /dev/null 2>&1; then
