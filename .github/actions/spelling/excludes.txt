@@ -55,5 +55,6 @@ ignore$
 \.webp$
 \.woff2?$
 \.zip$
+^\.agents/
 ^\.github/
 ^\Q.github/workflows/spelling.yml\E$
