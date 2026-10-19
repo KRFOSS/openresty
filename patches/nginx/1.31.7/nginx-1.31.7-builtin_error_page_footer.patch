@@ -1,13 +1,1072 @@
-diff --git a/src/http/ngx_http_special_response.c b/src/http/ngx_http_special_response.c
-index 64e5acd..f5374f6 100644
 --- a/src/http/ngx_http_special_response.c
 +++ b/src/http/ngx_http_special_response.c
-@@ -26,7 +26,7 @@ static u_char ngx_http_error_full_tail[] =
+@@ -10,6 +10,8 @@
+ #include <ngx_http.h>
+ #include <nginx.h>
+ 
++#include "ngx_http_rokfoss_error_pages.h"
++
+ 
+ static ngx_int_t ngx_http_send_error_page(ngx_http_request_t *r,
+     ngx_http_err_page_t *err_page);
+@@ -18,331 +20,6 @@
+ static ngx_int_t ngx_http_send_refresh(ngx_http_request_t *r);
  
  
- static u_char ngx_http_error_tail[] =
+-static u_char ngx_http_error_full_tail[] =
+-"<hr><center>" NGINX_VER "</center>" CRLF
+-"</body>" CRLF
+-"</html>" CRLF
+-;
+-
+-
+-static u_char ngx_http_error_build_tail[] =
+-"<hr><center>" NGINX_VER_BUILD "</center>" CRLF
+-"</body>" CRLF
+-"</html>" CRLF
+-;
+-
+-
+-static u_char ngx_http_error_tail[] =
 -"<hr><center>nginx</center>" CRLF
-+"<hr><center>openresty</center>" CRLF
- "</body>" CRLF
- "</html>" CRLF
- ;
+-"</body>" CRLF
+-"</html>" CRLF
+-;
+-
+-
+-static u_char ngx_http_msie_padding[] =
+-"<!-- a padding to disable MSIE and Chrome friendly error page -->" CRLF
+-"<!-- a padding to disable MSIE and Chrome friendly error page -->" CRLF
+-"<!-- a padding to disable MSIE and Chrome friendly error page -->" CRLF
+-"<!-- a padding to disable MSIE and Chrome friendly error page -->" CRLF
+-"<!-- a padding to disable MSIE and Chrome friendly error page -->" CRLF
+-"<!-- a padding to disable MSIE and Chrome friendly error page -->" CRLF
+-;
+-
+-
+-static u_char ngx_http_msie_refresh_head[] =
+-"<html><head><meta http-equiv=\"Refresh\" content=\"0; URL=";
+-
+-
+-static u_char ngx_http_msie_refresh_tail[] =
+-"\"></head><body></body></html>" CRLF;
+-
+-
+-static char ngx_http_error_301_page[] =
+-"<html>" CRLF
+-"<head><title>301 Moved Permanently</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>301 Moved Permanently</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_302_page[] =
+-"<html>" CRLF
+-"<head><title>302 Found</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>302 Found</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_303_page[] =
+-"<html>" CRLF
+-"<head><title>303 See Other</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>303 See Other</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_307_page[] =
+-"<html>" CRLF
+-"<head><title>307 Temporary Redirect</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>307 Temporary Redirect</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_308_page[] =
+-"<html>" CRLF
+-"<head><title>308 Permanent Redirect</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>308 Permanent Redirect</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_400_page[] =
+-"<html>" CRLF
+-"<head><title>400 Bad Request</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>400 Bad Request</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_401_page[] =
+-"<html>" CRLF
+-"<head><title>401 Authorization Required</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>401 Authorization Required</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_402_page[] =
+-"<html>" CRLF
+-"<head><title>402 Payment Required</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>402 Payment Required</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_403_page[] =
+-"<html>" CRLF
+-"<head><title>403 Forbidden</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>403 Forbidden</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_404_page[] =
+-"<html>" CRLF
+-"<head><title>404 Not Found</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>404 Not Found</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_405_page[] =
+-"<html>" CRLF
+-"<head><title>405 Not Allowed</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>405 Not Allowed</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_406_page[] =
+-"<html>" CRLF
+-"<head><title>406 Not Acceptable</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>406 Not Acceptable</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_407_page[] =
+-"<html>" CRLF
+-"<head><title>407 Proxy Authentication Required</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>407 Proxy Authentication Required</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_408_page[] =
+-"<html>" CRLF
+-"<head><title>408 Request Time-out</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>408 Request Time-out</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_409_page[] =
+-"<html>" CRLF
+-"<head><title>409 Conflict</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>409 Conflict</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_410_page[] =
+-"<html>" CRLF
+-"<head><title>410 Gone</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>410 Gone</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_411_page[] =
+-"<html>" CRLF
+-"<head><title>411 Length Required</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>411 Length Required</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_412_page[] =
+-"<html>" CRLF
+-"<head><title>412 Precondition Failed</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>412 Precondition Failed</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_413_page[] =
+-"<html>" CRLF
+-"<head><title>413 Request Entity Too Large</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>413 Request Entity Too Large</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_414_page[] =
+-"<html>" CRLF
+-"<head><title>414 Request-URI Too Large</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>414 Request-URI Too Large</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_415_page[] =
+-"<html>" CRLF
+-"<head><title>415 Unsupported Media Type</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>415 Unsupported Media Type</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_416_page[] =
+-"<html>" CRLF
+-"<head><title>416 Requested Range Not Satisfiable</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>416 Requested Range Not Satisfiable</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_421_page[] =
+-"<html>" CRLF
+-"<head><title>421 Misdirected Request</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>421 Misdirected Request</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_429_page[] =
+-"<html>" CRLF
+-"<head><title>429 Too Many Requests</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>429 Too Many Requests</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_494_page[] =
+-"<html>" CRLF
+-"<head><title>400 Request Header Or Cookie Too Large</title></head>"
+-CRLF
+-"<body>" CRLF
+-"<center><h1>400 Bad Request</h1></center>" CRLF
+-"<center>Request Header Or Cookie Too Large</center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_495_page[] =
+-"<html>" CRLF
+-"<head><title>400 The SSL certificate error</title></head>"
+-CRLF
+-"<body>" CRLF
+-"<center><h1>400 Bad Request</h1></center>" CRLF
+-"<center>The SSL certificate error</center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_496_page[] =
+-"<html>" CRLF
+-"<head><title>400 No required SSL certificate was sent</title></head>"
+-CRLF
+-"<body>" CRLF
+-"<center><h1>400 Bad Request</h1></center>" CRLF
+-"<center>No required SSL certificate was sent</center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_497_page[] =
+-"<html>" CRLF
+-"<head><title>400 The plain HTTP request was sent to HTTPS port</title></head>"
+-CRLF
+-"<body>" CRLF
+-"<center><h1>400 Bad Request</h1></center>" CRLF
+-"<center>The plain HTTP request was sent to HTTPS port</center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_500_page[] =
+-"<html>" CRLF
+-"<head><title>500 Internal Server Error</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>500 Internal Server Error</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_501_page[] =
+-"<html>" CRLF
+-"<head><title>501 Not Implemented</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>501 Not Implemented</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_502_page[] =
+-"<html>" CRLF
+-"<head><title>502 Bad Gateway</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>502 Bad Gateway</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_503_page[] =
+-"<html>" CRLF
+-"<head><title>503 Service Temporarily Unavailable</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>503 Service Temporarily Unavailable</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_504_page[] =
+-"<html>" CRLF
+-"<head><title>504 Gateway Time-out</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>504 Gateway Time-out</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_505_page[] =
+-"<html>" CRLF
+-"<head><title>505 HTTP Version Not Supported</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>505 HTTP Version Not Supported</h1></center>" CRLF
+-;
+-
+-
+-static char ngx_http_error_507_page[] =
+-"<html>" CRLF
+-"<head><title>507 Insufficient Storage</title></head>" CRLF
+-"<body>" CRLF
+-"<center><h1>507 Insufficient Storage</h1></center>" CRLF
+-;
+ 
+ 
+ static ngx_str_t ngx_http_error_pages[] = {
+@@ -383,7 +60,7 @@
+     ngx_string(ngx_http_error_415_page),
+     ngx_string(ngx_http_error_416_page),
+     ngx_null_string,                     /* 417 */
+-    ngx_null_string,                     /* 418 */
++    ngx_string(ngx_http_error_418_page),
+     ngx_null_string,                     /* 419 */
+     ngx_null_string,                     /* 420 */
+     ngx_string(ngx_http_error_421_page),
+@@ -681,30 +358,19 @@
+ ngx_http_send_special_response(ngx_http_request_t *r,
+     ngx_http_core_loc_conf_t *clcf, ngx_uint_t err)
+ {
+-    u_char       *tail;
+-    size_t        len;
+     ngx_int_t     rc;
+     ngx_buf_t    *b;
+     ngx_uint_t    msie_padding;
+-    ngx_chain_t   out[3];
+-
+-    if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_ON) {
+-        len = sizeof(ngx_http_error_full_tail) - 1;
+-        tail = ngx_http_error_full_tail;
+-
+-    } else if (clcf->server_tokens == NGX_HTTP_SERVER_TOKENS_BUILD) {
+-        len = sizeof(ngx_http_error_build_tail) - 1;
+-        tail = ngx_http_error_build_tail;
+-
+-    } else {
+-        len = sizeof(ngx_http_error_tail) - 1;
+-        tail = ngx_http_error_tail;
+-    }
++    ngx_chain_t   out[4];
+ 
+     msie_padding = 0;
+ 
+     if (ngx_http_error_pages[err].len) {
+-        r->headers_out.content_length_n = ngx_http_error_pages[err].len + len;
++        r->headers_out.content_length_n =
++            sizeof(ngx_http_rokfoss_error_head) - 1
++            + ngx_http_error_pages[err].len
++            + sizeof(ngx_http_rokfoss_error_tail) - 1;
++
+         if (clcf->msie_padding
+             && (r->headers_in.msie || r->headers_in.chrome)
+             && r->http_version >= NGX_HTTP_VERSION_10
+@@ -716,7 +382,8 @@
+         }
+ 
+         r->headers_out.content_type_len = sizeof("text/html") - 1;
+-        ngx_str_set(&r->headers_out.content_type, "text/html");
++        ngx_str_set(&r->headers_out.content_type,
++                    "text/html; charset=utf-8");
+         r->headers_out.content_type_lowcase = NULL;
+ 
+     } else {
+@@ -748,8 +415,9 @@
+     }
+ 
+     b->memory = 1;
+-    b->pos = ngx_http_error_pages[err].data;
+-    b->last = ngx_http_error_pages[err].data + ngx_http_error_pages[err].len;
++    b->pos = ngx_http_rokfoss_error_head;
++    b->last = ngx_http_rokfoss_error_head
++              + sizeof(ngx_http_rokfoss_error_head) - 1;
+ 
+     out[0].buf = b;
+     out[0].next = &out[1];
+@@ -760,12 +428,24 @@
+     }
+ 
+     b->memory = 1;
+-
+-    b->pos = tail;
+-    b->last = tail + len;
++    b->pos = ngx_http_error_pages[err].data;
++    b->last = ngx_http_error_pages[err].data + ngx_http_error_pages[err].len;
+ 
+     out[1].buf = b;
+-    out[1].next = NULL;
++    out[1].next = &out[2];
++
++    b = ngx_calloc_buf(r->pool);
++    if (b == NULL) {
++        return NGX_ERROR;
++    }
++
++    b->memory = 1;
++    b->pos = ngx_http_rokfoss_error_tail;
++    b->last = ngx_http_rokfoss_error_tail
++              + sizeof(ngx_http_rokfoss_error_tail) - 1;
++
++    out[2].buf = b;
++    out[2].next = NULL;
+ 
+     if (msie_padding) {
+         b = ngx_calloc_buf(r->pool);
+@@ -777,9 +457,9 @@
+         b->pos = ngx_http_msie_padding;
+         b->last = ngx_http_msie_padding + sizeof(ngx_http_msie_padding) - 1;
+ 
+-        out[1].next = &out[2];
+-        out[2].buf = b;
+-        out[2].next = NULL;
++        out[2].next = &out[3];
++        out[3].buf = b;
++        out[3].next = NULL;
+     }
+ 
+     if (r == r->main) {
+--- /dev/null
++++ b/src/http/ngx_http_rokfoss_error_pages.h
+@@ -0,0 +1,605 @@
++#ifndef _NGX_HTTP_ROKFOSS_ERROR_PAGES_H_INCLUDED_
++#define _NGX_HTTP_ROKFOSS_ERROR_PAGES_H_INCLUDED_
++
++
++static u_char ngx_http_rokfoss_error_head[] =
++"<!DOCTYPE html>" CRLF
++"<html lang=\"ko\">" CRLF
++"<head>" CRLF
++"<meta charset=\"UTF-8\">" CRLF
++"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" CRLF
++"<meta name=\"color-scheme\" content=\"dark\">" CRLF
++"<title>ROKFOSS-Shield</title>" CRLF
++"<style>" CRLF
++":root{--focus-ring:#06b6d4;--bg:#1a1a1a;--text:#e5e5e5;--muted:#aaa}html{box-sizing:border-box}*,*::before,*::after{box-sizing:inherit}html,body{width:100%;overflow-x:hidden}*{font-family:-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,\"Noto Sans\",sans-serif}body{background:var(--bg);color:var(--text);margin:0;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}:focus-visible{outline:3px solid var(--focus-ring);outline-offset:2px}.navbar{position:fixed;inset:0 0 auto;width:100%;padding:23px 23px 40px;z-index:10;background:linear-gradient(to bottom,rgba(0,0,0,.8) 0%,rgba(0,0,0,.65) 20%,rgba(0,0,0,.5) 40%,rgba(0,0,0,.35) 60%,rgba(0,0,0,.2) 75%,rgba(0,0,0,.1) 85%,rgba(0,0,0,.04) 93%,transparent 100%)}.container{width:100%;max-width:1200px;margin:0 auto;padding:0 1rem}.navbar-brand{display:inline-flex;align-items:center}.navbar-brand img{display:block;width:auto;height:40px}.error-main{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;padding:140px 20px 80px}.error-content{width:100%;max-width:620px}h1{margin:0 0 .5rem;color:#fff;font-size:clamp(3rem,9vw,4.5rem);font-weight:750;line-height:1}p{font-size:16px;line-height:1.6}.error-title{margin:0 0 2rem;color:#fff;font-size:20px;font-weight:600}.footer-text{margin-top:2rem;color:var(--muted);font-size:14px}.request-path{min-height:1.5em;margin:1rem auto 0;color:#8a8a8a;font-family:ui-monospace,SFMono-Regular,Consolas,\"Liberation Mono\",monospace;font-size:13px;overflow-wrap:anywhere}.product{margin:2.5rem 0 0;color:#777;font-size:12px;letter-spacing:.08em}strong{color:#fff}@media(max-width:768px){.navbar{padding:12px 15px 32px}.navbar-brand img{height:28px}.error-main{padding-top:110px}}" CRLF
++"</style>" CRLF
++"</head>" CRLF
++"<body>" CRLF
++"<nav class=\"navbar\" aria-label=\"ROKFOSS\">" CRLF
++"<div class=\"container\">" CRLF
++"<a class=\"navbar-brand\" href=\"/\" aria-label=\"홈으로 이동\">" CRLF
++"<img src=\"data:image/png;base64,"
++"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"
++"\" alt=\"ROKFOSS PROJECT\">" CRLF
++"</a>" CRLF
++"</div>" CRLF
++"</nav>" CRLF
++"<main class=\"error-main\">" CRLF
++"<div class=\"error-content\">" CRLF
++;
++
++
++static u_char ngx_http_rokfoss_error_tail[] =
++"<p class=\"request-path\" id=\"dynamic-path\" aria-label=\"요청 경로\"></p>" CRLF
++"<p class=\"product\">ROKFOSS-Shield</p>" CRLF
++"</div>" CRLF
++"</main>" CRLF
++"<script>" CRLF
++"(function(){try{var d=document.getElementById(\"dynamic-domain\"),p=document.getElementById(\"dynamic-path\"),h=window.location.hostname,u=window.location.pathname+window.location.search;if(d&&h){d.textContent=h}if(p&&u){p.textContent=u}}catch(e){}}());" CRLF
++"</script>" CRLF
++"</body>" CRLF
++"</html>" CRLF
++;
++
++
++static u_char ngx_http_msie_padding[] =
++"<!-- a padding to disable MSIE and Chrome friendly error page -->" CRLF
++"<!-- a padding to disable MSIE and Chrome friendly error page -->" CRLF
++"<!-- a padding to disable MSIE and Chrome friendly error page -->" CRLF
++"<!-- a padding to disable MSIE and Chrome friendly error page -->" CRLF
++"<!-- a padding to disable MSIE and Chrome friendly error page -->" CRLF
++"<!-- a padding to disable MSIE and Chrome friendly error page -->" CRLF
++;
++
++
++static u_char ngx_http_msie_refresh_head[] =
++"<html><head><meta http-equiv=\"Refresh\" content=\"0; URL=";
++
++
++static u_char ngx_http_msie_refresh_tail[] =
++"\"></head><body></body></html>" CRLF;
++
++
++static char ngx_http_error_301_page[] =
++"<h1>301</h1>" CRLF
++"<p class=\"error-title\">영구적으로 이동되었습니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청한 리소스의 주소가 영구적으로 변경되었습니다.</p>" CRLF
++"<p class=\"footer-text\">새 주소로 이동합니다.</p>" CRLF
++;
++
++
++static char ngx_http_error_302_page[] =
++"<h1>302</h1>" CRLF
++"<p class=\"error-title\">다른 위치로 이동합니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청한 리소스가 일시적으로 다른 주소에 있습니다.</p>" CRLF
++"<p class=\"footer-text\">새 주소로 이동합니다.</p>" CRLF
++;
++
++
++static char ngx_http_error_303_page[] =
++"<h1>303</h1>" CRLF
++"<p class=\"error-title\">다른 응답을 확인해 주세요.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청 결과를 다른 주소에서 확인할 수 있습니다.</p>" CRLF
++"<p class=\"footer-text\">새 주소로 이동합니다.</p>" CRLF
++;
++
++
++static char ngx_http_error_307_page[] =
++"<h1>307</h1>" CRLF
++"<p class=\"error-title\">일시적으로 이동되었습니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청한 리소스가 일시적으로 다른 주소에 있습니다.</p>" CRLF
++"<p class=\"footer-text\">같은 요청 방식으로 새 주소에 연결합니다.</p>" CRLF
++;
++
++
++static char ngx_http_error_308_page[] =
++"<h1>308</h1>" CRLF
++"<p class=\"error-title\">영구적으로 이동되었습니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청한 리소스의 주소가 영구적으로 변경되었습니다.</p>" CRLF
++"<p class=\"footer-text\">같은 요청 방식으로 새 주소에 연결합니다.</p>" CRLF
++;
++
++
++static char ngx_http_error_400_page[] =
++"<h1>400</h1>" CRLF
++"<p class=\"error-title\">잘못된 요청입니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청 형식이 올바르지 않아 처리할 수 없습니다.</p>" CRLF
++"<p class=\"footer-text\">주소와 요청 내용을 확인해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_401_page[] =
++"<h1>401</h1>" CRLF
++"<p class=\"error-title\">인증이 필요합니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 이 리소스를 이용하려면 인증이 필요합니다.</p>" CRLF
++"<p class=\"footer-text\">로그인 상태나 인증 정보를 확인해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_402_page[] =
++"<h1>402</h1>" CRLF
++"<p class=\"error-title\">결제가 필요합니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청한 리소스를 이용하려면 결제가 필요합니다.</p>" CRLF
++"<p class=\"footer-text\">결제 상태를 확인해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_403_page[] =
++"<h1>403</h1>" CRLF
++"<p class=\"error-title\">접근이 거부되었습니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 이 리소스에 접근할 권한이 없습니다.</p>" CRLF
++"<p class=\"footer-text\">권한이 있다고 생각되면 서비스 관리자에게 문의해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_404_page[] =
++"<h1>404</h1>" CRLF
++"<p class=\"error-title\">페이지를 찾을 수 없습니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청한 리소스를 찾을 수 없습니다.</p>" CRLF
++"<p class=\"footer-text\">주소가 정확한지 확인해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_405_page[] =
++"<h1>405</h1>" CRLF
++"<p class=\"error-title\">허용되지 않은 요청 방식입니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 이 리소스에서는 사용한 HTTP 메서드를 지원하지 않습니다.</p>" CRLF
++"<p class=\"footer-text\">요청 방식을 확인해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_406_page[] =
++"<h1>406</h1>" CRLF
++"<p class=\"error-title\">허용 가능한 응답이 없습니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청 조건에 맞는 형식으로 응답할 수 없습니다.</p>" CRLF
++"<p class=\"footer-text\">요청 헤더를 확인해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_407_page[] =
++"<h1>407</h1>" CRLF
++"<p class=\"error-title\">프록시 인증이 필요합니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 이 요청을 계속하려면 프록시 인증이 필요합니다.</p>" CRLF
++"<p class=\"footer-text\">프록시 인증 정보를 확인해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_408_page[] =
++"<h1>408</h1>" CRLF
++"<p class=\"error-title\">요청 시간이 초과되었습니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 제한 시간 안에 요청을 완료하지 못했습니다.</p>" CRLF
++"<p class=\"footer-text\">연결 상태를 확인한 뒤 다시 시도해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_409_page[] =
++"<h1>409</h1>" CRLF
++"<p class=\"error-title\">요청이 충돌했습니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 현재 리소스 상태와 요청이 충돌하여 처리할 수 없습니다.</p>" CRLF
++"<p class=\"footer-text\">리소스 상태를 확인한 뒤 다시 시도해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_410_page[] =
++"<h1>410</h1>" CRLF
++"<p class=\"error-title\">리소스가 더 이상 없습니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청한 리소스는 영구적으로 제거되었습니다.</p>" CRLF
++"<p class=\"footer-text\">주소나 대체 리소스를 확인해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_411_page[] =
++"<h1>411</h1>" CRLF
++"<p class=\"error-title\">요청 길이가 필요합니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청을 처리하려면 Content-Length 헤더가 필요합니다.</p>" CRLF
++"<p class=\"footer-text\">요청 헤더를 확인해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_412_page[] =
++"<h1>412</h1>" CRLF
++"<p class=\"error-title\">사전 조건을 충족하지 못했습니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청에 지정된 조건을 만족하지 못했습니다.</p>" CRLF
++"<p class=\"footer-text\">요청 조건을 확인해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_413_page[] =
++"<h1>413</h1>" CRLF
++"<p class=\"error-title\">요청 내용이 너무 큽니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청 본문이 서버에서 허용하는 크기를 초과했습니다.</p>" CRLF
++"<p class=\"footer-text\">파일이나 요청 데이터의 크기를 줄여 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_414_page[] =
++"<h1>414</h1>" CRLF
++"<p class=\"error-title\">요청 주소가 너무 깁니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청 URI가 서버에서 허용하는 길이를 초과했습니다.</p>" CRLF
++"<p class=\"footer-text\">주소나 쿼리 문자열을 줄여 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_415_page[] =
++"<h1>415</h1>" CRLF
++"<p class=\"error-title\">지원하지 않는 미디어 형식입니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청 데이터 형식을 이 서버에서 지원하지 않습니다.</p>" CRLF
++"<p class=\"footer-text\">Content-Type과 데이터 형식을 확인해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_416_page[] =
++"<h1>416</h1>" CRLF
++"<p class=\"error-title\">요청 범위를 제공할 수 없습니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청한 바이트 범위가 리소스 범위를 벗어났습니다.</p>" CRLF
++"<p class=\"footer-text\">Range 헤더를 확인해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_418_page[] =
++"<h1>418</h1>" CRLF
++"<p class=\"error-title\">난 찻잔이야</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에 대한 요청은 찻잔에 담궈졌습니다.</p>" CRLF
++"<p class=\"footer-text\">차를 즐기는 시간을 가져보면 어떨까요?<br>홍차를 한 잔 하시죠!</p>" CRLF
++;
++
++
++static char ngx_http_error_421_page[] =
++"<h1>421</h1>" CRLF
++"<p class=\"error-title\">잘못 전달된 요청입니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 이 서버가 처리할 수 없는 대상으로 요청이 전달되었습니다.</p>" CRLF
++"<p class=\"footer-text\">접속한 주소와 연결 설정을 확인해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_429_page[] =
++"<h1>429</h1>" CRLF
++"<p class=\"error-title\">요청이 너무 많습니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 짧은 시간 동안 너무 많은 요청이 감지되었습니다.</p>" CRLF
++"<p class=\"footer-text\">잠시 후 다시 시도해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_494_page[] =
++"<h1>400</h1>" CRLF
++"<p class=\"error-title\">요청 헤더가 너무 큽니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청 헤더나 쿠키가 서버에서 허용하는 크기를 초과했습니다.</p>" CRLF
++"<p class=\"footer-text\">쿠키를 정리하거나 요청 헤더를 줄여 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_495_page[] =
++"<h1>400</h1>" CRLF
++"<p class=\"error-title\">SSL 인증서 오류입니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 클라이언트 인증서를 확인할 수 없어 요청을 처리하지 못했습니다.</p>" CRLF
++"<p class=\"footer-text\">올바른 클라이언트 인증서를 사용해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_496_page[] =
++"<h1>400</h1>" CRLF
++"<p class=\"error-title\">SSL 인증서가 필요합니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청을 처리하려면 클라이언트 인증서가 필요합니다.</p>" CRLF
++"<p class=\"footer-text\">클라이언트 인증서를 설정한 뒤 다시 시도해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_497_page[] =
++"<h1>400</h1>" CRLF
++"<p class=\"error-title\">HTTPS 연결이 필요합니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 HTTPS 포트로 일반 HTTP 요청이 전송되었습니다.</p>" CRLF
++"<p class=\"footer-text\">주소를 https://로 시작해 다시 접속해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_500_page[] =
++"<h1>500</h1>" CRLF
++"<p class=\"error-title\">서버 내부 오류</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청을 처리하는 중 서버에서 문제가 발생했습니다.</p>" CRLF
++"<p class=\"footer-text\">잠시 후 다시 시도해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_501_page[] =
++"<h1>501</h1>" CRLF
++"<p class=\"error-title\">구현되지 않은 기능입니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 이 요청을 처리하는 기능을 서버에서 지원하지 않습니다.</p>" CRLF
++"<p class=\"footer-text\">다른 요청 방식을 사용해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_502_page[] =
++"<h1>502</h1>" CRLF
++"<p class=\"error-title\">게이트웨이 오류</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 상위 서버로부터 정상적인 응답을 받지 못했습니다.</p>" CRLF
++"<p class=\"footer-text\">잠시 후 다시 시도해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_503_page[] =
++"<h1>503</h1>" CRLF
++"<p class=\"error-title\">서비스를 사용할 수 없습니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 현재 서비스를 일시적으로 사용할 수 없습니다.</p>" CRLF
++"<p class=\"footer-text\">잠시 후 다시 시도해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_504_page[] =
++"<h1>504</h1>" CRLF
++"<p class=\"error-title\">게이트웨이 응답 시간 초과</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 상위 서버가 제한 시간 내에 응답하지 않았습니다.</p>" CRLF
++"<p class=\"footer-text\">잠시 후 다시 시도해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_505_page[] =
++"<h1>505</h1>" CRLF
++"<p class=\"error-title\">지원하지 않는 HTTP 버전입니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청에 사용된 HTTP 버전을 서버에서 지원하지 않습니다.</p>" CRLF
++"<p class=\"footer-text\">지원되는 프로토콜 버전으로 다시 시도해 주세요.</p>" CRLF
++;
++
++
++static char ngx_http_error_507_page[] =
++"<h1>507</h1>" CRLF
++"<p class=\"error-title\">저장 공간이 부족합니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 요청을 완료하는 데 필요한 저장 공간이 부족합니다.</p>" CRLF
++"<p class=\"footer-text\">잠시 후 다시 시도해 주세요.</p>" CRLF
++;
++
++
++#endif /* _NGX_HTTP_ROKFOSS_ERROR_PAGES_H_INCLUDED_ */
+--- a/src/http/ngx_http_header_filter_module.c
++++ b/src/http/ngx_http_header_filter_module.c
+@@ -102,7 +102,7 @@
+     ngx_string("415 Unsupported Media Type"),
+     ngx_string("416 Requested Range Not Satisfiable"),
+     ngx_null_string,  /* "417 Expectation Failed" */
+-    ngx_null_string,  /* "418 unused" */
++    ngx_string("418 I'm a teapot"),
+     ngx_null_string,  /* "419 unused" */
+     ngx_null_string,  /* "420 unused" */
+     ngx_string("421 Misdirected Request"),
