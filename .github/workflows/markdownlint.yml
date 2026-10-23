@@ -15,16 +15,21 @@ on:
       - '**/*.markdown'
       - '**/COPYRIGHT'
 
+permissions:
+  contents: read
+
 jobs:
   lint-content:
     name: Lint content markdown files
     runs-on: ubuntu-latest
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        persist-credentials: false
 
     - name: Lint markdown files
-      uses: avto-dev/markdown-lint@v1
+      uses: avto-dev/markdown-lint@04d43ee9191307b50935a753da3b775ab695eceb # v1.5.0
       with:
         config: './.markdownlint.jsonc'
         args: './content/**/*.md'

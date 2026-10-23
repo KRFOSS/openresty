@@ -49,7 +49,7 @@ jobs:
 
     steps:
       - name: 소스 체크아웃
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
 
@@ -121,7 +121,7 @@ jobs:
         run: mkdir -p download-cache
 
       - name: 소스 아카이브 캐시
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: download-cache
           key: package-release-${{ matrix.goarch }}-${{ env.PCRE_VER }}-${{ env.OPENSSL_VER }}-${{ hashFiles('util/mirror-tarballs') }}
@@ -290,7 +290,7 @@ jobs:
           ls -lh release
 
       - name: 패키지 아티팩트 업로드
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: packages-${{ matrix.goarch }}
           path: release/*
@@ -305,7 +305,7 @@ jobs:
 
     steps:
       - name: 패키지 아티팩트 다운로드
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: packages-*
           path: release
