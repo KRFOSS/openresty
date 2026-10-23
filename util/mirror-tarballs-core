@@ -197,7 +197,7 @@ echo "$info_txt applying the ROKFOSS custom autoindex patch"
 patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_autoindex.patch || exit 1
 echo
 
-echo "$info_txt applying the ROKFOSS URI CR/LF rejection patch"
+echo "$info_txt applying the ROKFOSS URI control character rejection patch"
 patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_uri_crlf.patch || exit 1
 echo
 
