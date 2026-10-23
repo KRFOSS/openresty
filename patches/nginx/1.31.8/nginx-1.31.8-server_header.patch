@@ -1,7 +1,7 @@
 --- a/src/core/nginx.h
 +++ b/src/core/nginx.h
-@@ -11,10 +11,10 @@
- 
+@@ -11,12 +11,12 @@
+
  #define nginx_version      1031008
  #define NGINX_VERSION      "1.31.8"
 -#define NGINX_VER          "nginx/" NGINX_VERSION
@@ -9,10 +9,13 @@
  
  #ifdef NGX_BUILD
 -#define NGINX_VER_BUILD    NGINX_VER " (" NGX_BUILD ")"
-+#define NGINX_VER_BUILD    NGINX_VER
++#define NGINX_VER_BUILD    NGINX_VER "-R"
  #else
- #define NGINX_VER_BUILD    NGINX_VER
+-#define NGINX_VER_BUILD    NGINX_VER
++#define NGINX_VER_BUILD    NGINX_VER "-R"
  #endif
+
+ #define NGINX_VAR          "NGINX"
 --- a/src/http/ngx_http_header_filter_module.c
 +++ b/src/http/ngx_http_header_filter_module.c
 @@ -47,7 +47,7 @@
