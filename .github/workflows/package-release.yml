@@ -46,11 +46,6 @@ jobs:
             debarch: amd64
             rpmarch: x86_64
             archarch: x86_64
-          - goarch: arm64
-            runner: ubuntu-22.04-arm
-            debarch: arm64
-            rpmarch: aarch64
-            archarch: aarch64
 
     steps:
       - name: 소스 체크아웃
