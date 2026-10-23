@@ -12,7 +12,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: package-release-${{ github.ref }}
@@ -50,16 +50,20 @@ jobs:
     steps:
       - name: 소스 체크아웃
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: 릴리스 버전 확인
         shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
 
           SOURCE_VERSION="$(./util/ver)"
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ inputs.version }}"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="$INPUT_VERSION"
             VERSION="${VERSION#v}"
             TRIGGER_NAME="수동 입력"
           else
@@ -72,13 +76,15 @@ jobs:
             exit 1
           fi
 
-          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9A-Za-z][0-9A-Za-z.+~_-]*$'; then
-            echo "지원하지 않는 버전 형식입니다: $VERSION"
+          # 입력값을 로그에 그대로 찍지 않는다. 줄 머리의 :: 가 워크플로 명령으로 해석될 수 있다.
+          VERSION_RE='^[0-9A-Za-z][0-9A-Za-z.+~_-]*$'
+          if [[ ! "$VERSION" =~ $VERSION_RE ]]; then
+            echo "지원하지 않는 버전 형식입니다."
             exit 1
           fi
 
           if [ "$VERSION" != "$SOURCE_VERSION" ]; then
-            echo "$TRIGGER_NAME 버전($VERSION)과 OpenResty 소스 버전($SOURCE_VERSION)이 일치하지 않습니다."
+            echo "$TRIGGER_NAME 버전과 OpenResty 소스 버전($SOURCE_VERSION)이 일치하지 않습니다."
             exit 1
           fi
 
@@ -294,6 +300,8 @@ jobs:
     name: GitHub 릴리스 생성
     needs: package
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
 
     steps:
       - name: 패키지 아티팩트 다운로드
@@ -313,14 +321,23 @@ jobs:
 
       - name: 릴리스 정보 결정
         shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ inputs.version }}"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="$INPUT_VERSION"
             VERSION="${VERSION#v}"
           else
             VERSION="${GITHUB_REF_NAME#v}"
+          fi
+
+          # 앞 job 과 같은 검사를 여기서도 한다. 값이 GITHUB_ENV 로 들어가기 때문이다.
+          VERSION_RE='^[0-9A-Za-z][0-9A-Za-z.+~_-]*$'
+          if [[ ! "$VERSION" =~ $VERSION_RE ]]; then
+            echo "지원하지 않는 버전 형식입니다."
+            exit 1
           fi
 
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
@@ -333,7 +350,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
               echo "릴리스 $RELEASE_TAG 이(가) 이미 존재합니다."
               exit 1
