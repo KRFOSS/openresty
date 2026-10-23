@@ -23,10 +23,12 @@ env:
   COMMAND_NAME: rs
   JOBS: "3"
   PCRE_VER: "10.47"
+  PCRE_SHA256: "c08ae2388ef333e8403e670ad70c0a11f1eed021fd88308d7e02f596fcd9dc16"
   PCRE_PREFIX: /opt/pcre2
   PCRE_LIB: /opt/pcre2/lib
   PCRE_INC: /opt/pcre2/include
   OPENSSL_VER: "3.5.6"
+  OPENSSL_SHA256: "deae7c80cba99c4b4f940ecadb3c3338b13cb77418409238e57d7f31f2a3b736"
   OPENSSL_PATCH_VER: "3.5.5"
   OPENSSL_PREFIX: /opt/ssl3
   OPENSSL_LIB: /opt/ssl3/lib
@@ -37,6 +39,10 @@ jobs:
   package:
     name: ${{ matrix.goarch }} 패키지 빌드
     runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     strategy:
       fail-fast: false
       matrix:
@@ -138,6 +144,13 @@ jobs:
             wget -P download-cache "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${PCRE_VER}/pcre2-${PCRE_VER}.tar.gz"
           fi
 
+          # 내려받은 직후와 캐시 적중 모두 같은 해시로 검사한다. 어긋나면 캐시 파일을 지우고 멈춘다.
+          if ! echo "$PCRE_SHA256  download-cache/pcre2-$PCRE_VER.tar.gz" | sha256sum -c -; then
+            rm -f "download-cache/pcre2-$PCRE_VER.tar.gz"
+            echo "PCRE2 소스의 해시가 기대값과 다릅니다."
+            exit 1
+          fi
+
           rm -rf "pcre2-$PCRE_VER"
           tar zxf "download-cache/pcre2-$PCRE_VER.tar.gz"
           cd "pcre2-$PCRE_VER"
@@ -156,6 +169,13 @@ jobs:
 
           if [ ! -f "download-cache/openssl-$OPENSSL_VER.tar.gz" ]; then
             wget -P download-cache "https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VER}/openssl-${OPENSSL_VER}.tar.gz"
+          fi
+
+          # 내려받은 직후와 캐시 적중 모두 같은 해시로 검사한다. 어긋나면 캐시 파일을 지우고 멈춘다.
+          if ! echo "$OPENSSL_SHA256  download-cache/openssl-$OPENSSL_VER.tar.gz" | sha256sum -c -; then
+            rm -f "download-cache/openssl-$OPENSSL_VER.tar.gz"
+            echo "OpenSSL 소스의 해시가 기대값과 다릅니다."
+            exit 1
           fi
 
           rm -rf "openssl-$OPENSSL_VER"
@@ -289,6 +309,11 @@ jobs:
           tar --zstd -tf "release/${PACKAGE_NAME}-${VERSION}-1-${{ matrix.archarch }}.pkg.tar.zst" >/dev/null
           ls -lh release
 
+      - name: 패키지 출처 증명 생성
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: release/*
+
       - name: 패키지 아티팩트 업로드
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -302,6 +327,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      attestations: read
 
     steps:
       - name: 패키지 아티팩트 다운로드
@@ -310,6 +336,27 @@ jobs:
           pattern: packages-*
           path: release
           merge-multiple: true
+
+      - name: 패키지 출처 증명 검증
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # 빌드 job 이 만든 증명이 있는 파일만 릴리스한다. 증명이 없거나 다르면 여기서 멈춘다.
+          shopt -s nullglob
+          files=(release/*.deb release/*.rpm release/*.pkg.tar.zst)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "검증할 패키지가 없습니다."
+            exit 1
+          fi
+
+          for f in "${files[@]}"; do
+            gh attestation verify "$f" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/package-release.yml"
+          done
 
       - name: 체크섬 생성
         shell: bash
@@ -350,6 +397,8 @@ jobs:
         run: |
           set -euo pipefail
 
+          NOTE="패키지 출처 검증: gh attestation verify <파일> --repo $GITHUB_REPOSITORY"
+
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
               echo "릴리스 $RELEASE_TAG 이(가) 이미 존재합니다."
@@ -360,11 +409,13 @@ jobs:
               release/* \
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
+              --notes "$NOTE" \
               --generate-notes
           else
             gh release create "$RELEASE_TAG" \
               release/* \
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
+              --notes "$NOTE" \
               --generate-notes
           fi
