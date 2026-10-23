@@ -201,6 +201,10 @@ echo "$info_txt applying the ROKFOSS URI control character rejection patch"
 patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_uri_crlf.patch || exit 1
 echo
 
+echo "$info_txt applying the ROKFOSS include nesting depth limit patch"
+patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_conf_include_depth.patch || exit 1
+echo
+
 #patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-redirect_memcpy_overlap.patch || exit 1
 
 echo "$info_txt applying the no_error_pages patch for nginx"

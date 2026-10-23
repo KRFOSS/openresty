@@ -1,0 +1,59 @@
+--- a/src/core/ngx_conf_file.c
++++ b/src/core/ngx_conf_file.c
+@@ -823,6 +823,38 @@
+ }
+ 
+ 
++/*
++ * 자기 자신을 include 하거나 너무 깊게 include 하면 재귀가 스택을 다 써서
++ * nginx -t 가 SIGSEGV 로 죽는다. include 중첩 깊이를 제한해 오류로 끝낸다.
++ */
++
++#define NGX_CONF_INCLUDE_MAX_DEPTH  64
++
++static ngx_uint_t  ngx_conf_include_depth;
++
++
++static char *
++ngx_conf_include_parse(ngx_conf_t *cf, ngx_str_t *file)
++{
++    char  *rv;
++
++    if (ngx_conf_include_depth >= NGX_CONF_INCLUDE_MAX_DEPTH) {
++        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
++                           "include 중첩이 너무 깊습니다(최대 %d단계)",
++                           NGX_CONF_INCLUDE_MAX_DEPTH);
++        return NGX_CONF_ERROR;
++    }
++
++    ngx_conf_include_depth++;
++
++    rv = ngx_conf_parse(cf, file);
++
++    ngx_conf_include_depth--;
++
++    return rv;
++}
++
++
+ char *
+ ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ {
+@@ -844,7 +876,7 @@
+ 
+         ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "include %s", file.data);
+ 
+-        return ngx_conf_parse(cf, &file);
++        return ngx_conf_include_parse(cf, &file);
+     }
+ 
+     ngx_memzero(&gl, sizeof(ngx_glob_t));
+@@ -876,7 +908,7 @@
+ 
+         ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "include %s", file.data);
+ 
+-        rv = ngx_conf_parse(cf, &file);
++        rv = ngx_conf_include_parse(cf, &file);
+ 
+         if (rv != NGX_CONF_OK) {
+             break;
