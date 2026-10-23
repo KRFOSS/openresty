@@ -1,0 +1,13 @@
+--- a/src/http/ngx_http_parse.c
++++ b/src/http/ngx_http_parse.c
+@@ -1598,6 +1598,10 @@
+
+                 } else if (ch == '+') {
+                     r->plus_in_uri = 1;
++
++                } else if (ch == CR || ch == LF) {
++                    /* 디코드된 CR/LF 는 $uri 를 헤더 값으로 쓰는 설정에서 응답·요청 분할이 되므로 거부 */
++                    return NGX_HTTP_PARSE_INVALID_REQUEST;
+                 }
+
+                 state = quoted_state;
