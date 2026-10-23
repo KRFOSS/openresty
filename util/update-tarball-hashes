@@ -1,0 +1,406 @@
+#!/usr/bin/env bash
+
+# 사용법: util/update-tarball-hashes [옵션]
+#
+# util/mirror-tarballs-core 가 받는 모든 소스 tarball 을 새로 내려받아
+# util/tarball-sha256 (검증용 해시 목록)을 만들거나 갱신한다.
+#
+# 평소 빌드에서는 절대 자동으로 실행되지 않는다. 새 버전으로 올릴 때
+# 사람이 내용을 검토한 뒤 직접 실행하는 용도다.
+#
+# 옵션
+#   -n, --dry-run          목록을 쓰지 않고 무엇이 달라지는지만 보여 준다.
+#   --accept-changed NAME  이미 목록에 있는 NAME 의 해시가 달라졌을 때 새 값으로 바꾼다.
+#                          (여러 번 쓸 수 있다. 변조 가능성을 직접 따져 본 뒤에만 쓸 것)
+#   --prune                core 가 더 이상 받지 않는 항목을 목록에서 지운다.
+#   --allow-raw            gzip 이 아닌 파일을 file-sha256(바이트 그대로)으로 등록한다.
+#   --skip-cross-check     독립 출처 교차 확인을 건너뛴다. (권장하지 않음)
+#   -j N                   병렬 작업 수 (기본 8)
+#   -h, --help             이 도움말
+#
+# 동작
+#   1. core 에서 (출력파일명, URL) 쌍을 뽑는다. 못 읽는 호출이 있으면 중단한다.
+#   2. work/ 캐시를 쓰지 않고 임시 폴더로 새로 내려받는다.
+#   3. 해시를 계산한다. 기준은 gzip 을 푼 tar 내용의 sha256(tar-sha256)이다.
+#   4. 가능한 항목은 독립 출처와 대조한다.
+#        GitHub 저장소 tarball: 같은 태그를 git 으로 받아 git archive 내용과 비교
+#        nginx: nginx.org 의 PGP 서명 tarball 을 검증하고 소스 내용을 비교
+#   5. 추가/변경/미사용 항목을 보여 주고 diff 를 출력한다.
+#   6. 기존 항목의 해시가 달라졌거나, 교차 확인이 불일치했거나, 내려받기에 실패했으면
+#      아무것도 쓰지 않고 1로 끝난다.
+
+root=`perl -MCwd -e'print Cwd::abs_path(shift)' $(dirname -- "$0")/..`
+self=$root/util/update-tarball-hashes
+core=$root/util/mirror-tarballs-core
+hashfile=$root/util/tarball-sha256
+
+if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+    echo "bash 4 이상이 필요합니다." >&2
+    exit 2
+fi
+
+sha256_of_stream() {
+    if command -v sha256sum > /dev/null 2>&1; then
+        sha256sum | cut -d' ' -f1
+    else
+        shasum -a 256 | cut -d' ' -f1
+    fi
+}
+
+# 한 항목의 해시 방식:해시 를 계산한다. 인자: 파일 방식(tar|file)
+compute_hash() {
+    local f=$1 method=$2 h
+    if [ "$method" = "tar" ]; then
+        h=$(set -o pipefail; gzip -dc -- "$f" 2> /dev/null | sha256_of_stream) || return 1
+        echo "tar-sha256:$h"
+    else
+        h=$(sha256_of_stream < "$f")
+        echo "file-sha256:$h"
+    fi
+}
+
+# 일꾼: 내려받기. 인자: 임시폴더 이름 URL
+worker_dl() {
+    local tmp=$1 name=$2 url=$3
+    if wget -q --tries=3 --timeout=60 "$url" -O "$tmp/dl/$name"; then
+        echo 0 > "$tmp/dl/$name.rc"
+    else
+        rm -f -- "$tmp/dl/$name"
+        echo 1 > "$tmp/dl/$name.rc"
+    fi
+}
+
+# 교차 확인 결과를 기록한다. 인자: 임시폴더 이름 상태(OK|FAIL|NA) 설명
+xc_result() {
+    printf '%s\n%s\n' "$3" "$4" > "$1/xc/$2"
+}
+
+# 일꾼: GitHub 저장소 tarball 을 git 으로 받은 내용과 비교한다.
+xc_github() {
+    local tmp=$1 name=$2 url=$3 file=$tmp/dl/$2
+    local owner repo ref w
+    if [[ $url =~ ^https://github\.com/([^/]+)/([^/]+)/(tarball/(.+)|archive/refs/tags/(.+)\.tar\.gz|archive/(.+)\.tar\.gz)$ ]]; then
+        owner=${BASH_REMATCH[1]}
+        repo=${BASH_REMATCH[2]}
+        ref=${BASH_REMATCH[4]}${BASH_REMATCH[5]}${BASH_REMATCH[6]}
+    else
+        xc_result "$tmp" "$name" NA "GitHub 주소 형식을 해석하지 못함"
+        return
+    fi
+    w=$tmp/xcwork/$name
+    mkdir -p "$w/tar" "$w/git" || { xc_result "$tmp" "$name" NA "작업 폴더 생성 실패"; return; }
+    if ! git clone -q --depth 1 --branch "$ref" "https://github.com/$owner/$repo.git" "$w/repo" > "$w/clone.log" 2>&1; then
+        xc_result "$tmp" "$name" NA "git 저장소에서 $ref 를 받지 못함(브랜치/태그가 아니거나 접근 불가)"
+        return
+    fi
+    if [ "$(tar -tzf "$file" 2> /dev/null | cut -d/ -f1 | sort -u | wc -l)" -ne 1 ]; then
+        xc_result "$tmp" "$name" FAIL "tarball 최상위 폴더가 하나가 아님"
+        return
+    fi
+    tar -xzf "$file" -C "$w/tar" --strip-components=1 --no-same-owner 2> /dev/null \
+        || { xc_result "$tmp" "$name" FAIL "tarball 을 풀지 못함"; return; }
+    git -C "$w/repo" archive --format=tar HEAD 2> /dev/null | tar -xf - -C "$w/git" --no-same-owner \
+        || { xc_result "$tmp" "$name" NA "git archive 실패"; return; }
+    # 양쪽이 모두 비어 있으면 diff 가 빈 결과로 통과하므로 먼저 막는다.
+    if [ -z "$(ls -A "$w/tar")" ] || [ -z "$(ls -A "$w/git")" ]; then
+        xc_result "$tmp" "$name" FAIL "비교할 파일이 비어 있음"
+        return
+    fi
+    local d x1 x2 commit
+    d=$(diff -r "$w/tar" "$w/git" 2>&1 | head -n 5)
+    x1=$(cd "$w/tar" && find . -type f -perm /111 | sort)
+    x2=$(cd "$w/git" && find . -type f -perm /111 | sort)
+    commit=$(git -C "$w/repo" rev-parse --short=12 HEAD)
+    if [ -n "$d" ] || [ "$x1" != "$x2" ]; then
+        xc_result "$tmp" "$name" FAIL "git 저장소($owner/$repo@$ref $commit)와 내용이 다름: $(printf '%s' "$d" | head -n 1 | sed "s#$w/##g")"
+    else
+        xc_result "$tmp" "$name" OK "git 저장소 일치 ($owner/$repo@$ref $commit)"
+    fi
+    rm -rf -- "$w"
+}
+
+# 일꾼: nginx tarball 을 nginx.org 의 PGP 서명 tarball 과 비교한다.
+xc_nginx() {
+    local tmp=$1 name=$2 url=$3 file=$tmp/dl/$2 ver w gh keys k fpr
+    [[ $url =~ ^https://openresty\.org/download/nginx-([0-9.]+)\.tar\.gz$ ]] \
+        || { xc_result "$tmp" "$name" NA "nginx 주소 형식을 해석하지 못함"; return; }
+    ver=${BASH_REMATCH[1]}
+    w=$tmp/xcwork/$name
+    gh=$w/gnupg
+    mkdir -p -m 700 "$gh" "$w/off" "$w/ours" || { xc_result "$tmp" "$name" NA "작업 폴더 생성 실패"; return; }
+    wget -q --tries=3 --timeout=60 "https://nginx.org/download/nginx-$ver.tar.gz" -O "$w/official.tar.gz" \
+        && wget -q --tries=3 --timeout=60 "https://nginx.org/download/nginx-$ver.tar.gz.asc" -O "$w/official.tar.gz.asc" \
+        || { xc_result "$tmp" "$name" NA "nginx.org 에서 공식 tarball/서명을 받지 못함"; return; }
+    keys=$(wget -q --timeout=60 -O - https://nginx.org/en/pgp_keys.html 2> /dev/null | grep -oE 'keys/[A-Za-z0-9_.-]+\.key' | sort -u)
+    if [ -z "$keys" ]; then
+        xc_result "$tmp" "$name" NA "nginx.org 서명 키 목록을 받지 못함"
+        return
+    fi
+    for k in $keys; do
+        wget -q --timeout=60 -O - "https://nginx.org/$k" 2> /dev/null | GNUPGHOME=$gh gpg --batch --quiet --import > /dev/null 2>&1
+    done
+    fpr=$(GNUPGHOME=$gh gpg --batch --status-fd 1 --verify "$w/official.tar.gz.asc" "$w/official.tar.gz" 2> /dev/null \
+        | awk '/^\[GNUPG:\] VALIDSIG/ { print $12; exit }')
+    if [ -z "$fpr" ]; then
+        xc_result "$tmp" "$name" FAIL "nginx.org 공식 tarball 의 PGP 서명 검증 실패"
+        return
+    fi
+    tar -xzf "$w/official.tar.gz" -C "$w/off" --no-same-owner 2> /dev/null \
+        && tar -xzf "$file" -C "$w/ours" --no-same-owner 2> /dev/null \
+        || { xc_result "$tmp" "$name" FAIL "tarball 을 풀지 못함"; return; }
+    # 공식 tarball 에는 있고 저장소에서 뽑은 쪽에는 없는 문서류(CHANGES, html, man)와
+    # 그 반대(.github, docs, misc)는 달라도 된다. 실제 소스 경로는 모두 같아야 한다.
+    local bad
+    bad=$(LC_ALL=C diff -rq "$w/off/nginx-$ver" "$w/ours/nginx-$ver" 2>&1 \
+        | grep -vE '^Only in [^:]*/nginx-[0-9.]+: (CHANGES|CHANGES\.ru|html|man|\.github|\.gitignore|docs|misc)$' \
+        | head -n 3)
+    if [ -n "$bad" ]; then
+        xc_result "$tmp" "$name" FAIL "nginx.org 공식 tarball 과 소스 내용이 다름: $(printf '%s' "$bad" | head -n 1 | sed "s#$w/##g")"
+    else
+        xc_result "$tmp" "$name" OK "nginx.org PGP 서명 tarball 과 소스(src,auto,conf,contrib,configure) 일치, 서명키 지문 $fpr"
+    fi
+    rm -rf -- "$w"
+}
+
+worker_xc() {
+    local tmp=$1 name=$2 url=$3
+    case "$url" in
+        https://openresty.org/download/nginx-*) xc_nginx "$tmp" "$name" "$url" ;;
+        https://github.com/*) xc_github "$tmp" "$name" "$url" ;;
+        *) xc_result "$tmp" "$name" NA "독립 출처 없음" ;;
+    esac
+}
+
+# 숨은 하위 명령(병렬 일꾼)
+case "${1:-}" in
+    --_dl) shift; worker_dl "$@"; exit 0 ;;
+    --_xc) shift; worker_xc "$@"; exit 0 ;;
+esac
+
+dry_run=0
+prune=0
+allow_raw=0
+skip_xc=0
+jobs=8
+declare -A accept
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -n|--dry-run) dry_run=1 ;;
+        --accept-changed) shift; [ $# -gt 0 ] || { echo "--accept-changed 에 파일명이 필요합니다." >&2; exit 2; }; accept[$1]=1 ;;
+        --prune) prune=1 ;;
+        --allow-raw) allow_raw=1 ;;
+        --skip-cross-check) skip_xc=1 ;;
+        -j) shift; jobs=${1:-}; case "$jobs" in ''|*[!0-9]*|0) echo "-j 에는 양의 정수가 필요합니다." >&2; exit 2 ;; esac ;;
+        -h|--help) awk 'NR > 2 && /^#/ { sub(/^# ?/, ""); print; next } NR > 2 { exit }' "$0"; exit 0 ;;
+        *) echo "알 수 없는 옵션: $1 (--help 참고)" >&2; exit 2 ;;
+    esac
+    shift
+done
+
+for c in wget gzip tar awk git gpg diff; do
+    command -v "$c" > /dev/null 2>&1 || { echo "필요한 명령이 없습니다: $c" >&2; exit 2; }
+done
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/tarball-hashes.XXXXXX") || exit 1
+trap 'rm -rf -- "$tmp"' EXIT
+trap 'exit 130' HUP INT TERM
+mkdir -p "$tmp/dl" "$tmp/xc" "$tmp/xcwork" || exit 1
+
+problems=0
+problem() {
+    echo "[문제] $*" >&2
+    problems=$((problems + 1))
+}
+
+# 1. core 에서 (출력파일명, URL) 쌍 뽑기
+main_ver=$(bash -c ". '$root/util/ver' > /dev/null; echo \$main_ver")
+if [ -z "$main_ver" ]; then
+    echo "util/ver 에서 main_ver 를 읽지 못했습니다." >&2
+    exit 1
+fi
+awk -v main_ver="$main_ver" '
+/^ver=/ { v=$0; sub(/^ver=/,"",v); gsub(/"/,"",v); gsub(/\$main_ver/,main_ver,v); ver=v; next }
+/^\$root\/util\/get-tarball "/ {
+    line=$0; sub(/^\$root\/util\/get-tarball +/,"",line)
+    match(line,/^"[^"]*"/); url=substr(line,2,RLENGTH-2); rest=substr(line,RLENGTH+1)
+    sub(/^ +-O +/,"",rest)
+    if (rest ~ /^"/) { match(rest,/^"[^"]*"/); out=substr(rest,2,RLENGTH-2) } else { split(rest,a," "); out=a[1] }
+    gsub(/\$ver/,ver,url); gsub(/\$ver/,ver,out)
+    print out "\t" url
+}' "$core" > "$tmp/targets.tsv"
+
+# 읽지 못한 호출이나 풀리지 않은 변수가 있으면 목록이 불완전해질 수 있으므로 중단한다.
+unparsed=$(grep -n 'get-tarball' "$core" | grep -vE '^[0-9]+:(#|\$root/util/get-tarball ")' | head -n 3)
+if [ -n "$unparsed" ]; then
+    echo "core 에서 인식하지 못한 get-tarball 호출이 있습니다. 이 스크립트의 추출 규칙을 고쳐야 합니다:" >&2
+    echo "$unparsed" >&2
+    exit 1
+fi
+if grep -q '[$`]' "$tmp/targets.tsv"; then
+    echo "core 에서 변수를 풀지 못한 항목이 있습니다:" >&2
+    grep '[$`]' "$tmp/targets.tsv" >&2
+    exit 1
+fi
+if [ ! -s "$tmp/targets.tsv" ]; then
+    echo "core 에서 받을 tarball 을 하나도 찾지 못했습니다." >&2
+    exit 1
+fi
+dup=$(cut -f1 "$tmp/targets.tsv" | sort | uniq -d | head -n 3)
+if [ -n "$dup" ]; then
+    echo "core 에 같은 출력파일명이 여러 번 나옵니다: $dup" >&2
+    exit 1
+fi
+bad_name=$(cut -f1 "$tmp/targets.tsv" | grep -vE '^[A-Za-z0-9._+-]+$' | head -n 3)
+if [ -n "$bad_name" ]; then
+    echo "허용되지 않는 문자가 든 출력파일명이 있습니다: $bad_name" >&2
+    exit 1
+fi
+
+total=$(wc -l < "$tmp/targets.tsv")
+echo "받을 tarball: $total 개 (core: util/mirror-tarballs-core)"
+
+# 2. 새로 내려받기 (work/ 캐시는 쓰지 않는다)
+echo "내려받는 중..."
+tr '\t\n' '\0\0' < "$tmp/targets.tsv" | xargs -0 -n 2 -P "$jobs" "$self" --_dl "$tmp"
+
+# 기존 목록 읽기
+declare -A old
+if [ -f "$hashfile" ]; then
+    while read -r entry name; do
+        case "$entry" in ''|'#'*) continue ;; esac
+        old[$name]=$entry
+    done < "$hashfile"
+fi
+
+# 3. 해시 계산
+declare -A newhash
+while IFS=$'\t' read -r name url; do
+    if [ "$(cat "$tmp/dl/$name.rc" 2> /dev/null)" != "0" ]; then
+        problem "$name: 내려받기 실패 ($url)"
+        continue
+    fi
+    method=tar
+    if ! gzip -t -- "$tmp/dl/$name" 2> /dev/null; then
+        if [ "${old[$name]:-}" = "${old[$name]#file-sha256:}" ] && [ "$allow_raw" -ne 1 ]; then
+            problem "$name: gzip 파일이 아닙니다(오류 페이지일 수 있음). 정말 gzip 이 아닌 파일이면 --allow-raw 를 쓰세요."
+            continue
+        fi
+        method=file
+    fi
+    newhash[$name]=$(compute_hash "$tmp/dl/$name" "$method") || { problem "$name: 해시 계산 실패"; unset "newhash[$name]"; }
+done < "$tmp/targets.tsv"
+
+# 4. 교차 확인
+if [ "$skip_xc" -eq 1 ]; then
+    echo "교차 확인을 건너뜁니다(--skip-cross-check)."
+else
+    echo "독립 출처와 교차 확인하는 중(git 저장소 내려받기가 있어 1~2분 걸릴 수 있음)..."
+    # 해시가 계산된 항목만 일꾼에게 넘긴다.
+    : > "$tmp/xc.args"
+    while IFS=$'\t' read -r name url; do
+        [ -n "${newhash[$name]:-}" ] && printf '%s\0%s\0' "$name" "$url" >> "$tmp/xc.args"
+    done < "$tmp/targets.tsv"
+    xargs -0 -n 2 -P "$jobs" "$self" --_xc "$tmp" < "$tmp/xc.args"
+fi
+
+# 5. 보고
+added=0; changed=0; same=0; xc_ok=0; xc_na=0
+declare -A final
+for name in "${!old[@]}"; do
+    final[$name]=${old[$name]}
+done
+
+echo
+echo "항목별 결과"
+while IFS=$'\t' read -r name url; do
+    [ -n "${newhash[$name]:-}" ] || continue
+    nh=${newhash[$name]}
+    xcs=NA; xcm="교차 확인 안 함"
+    if [ -f "$tmp/xc/$name" ]; then
+        xcs=$(sed -n 1p "$tmp/xc/$name")
+        xcm=$(sed -n 2p "$tmp/xc/$name")
+    fi
+    case "$xcs" in
+        OK) xc_ok=$((xc_ok + 1)) ;;
+        NA) xc_na=$((xc_na + 1)) ;;
+    esac
+    if [ "$xcs" = "FAIL" ]; then
+        problem "$name: 교차 확인 불일치 - $xcm"
+        continue
+    fi
+    if [ -z "${old[$name]:-}" ]; then
+        added=$((added + 1))
+        final[$name]=$nh
+        printf '[추가] %s\n       %s\n       교차 확인: %s\n' "$name" "$nh" "$xcm"
+    elif [ "${old[$name]}" = "$nh" ]; then
+        same=$((same + 1))
+    elif [ -n "${accept[$name]:-}" ]; then
+        changed=$((changed + 1))
+        final[$name]=$nh
+        printf '[변경 승인] %s\n       이전 %s\n       이후 %s\n       교차 확인: %s\n' "$name" "${old[$name]}" "$nh" "$xcm"
+    else
+        problem "$name: 기존 해시와 다릅니다. 같은 버전의 내용이 바뀐 것이므로 변조일 수 있습니다.
+       기존 ${old[$name]}
+       현재 $nh
+       교차 확인: $xcm
+       정상 변경임을 직접 확인했다면 --accept-changed $name 을 붙여 다시 실행하세요."
+    fi
+done < "$tmp/targets.tsv"
+
+# 미사용 항목
+cut -f1 "$tmp/targets.tsv" | sort > "$tmp/target.names"
+stale=0
+for name in "${!old[@]}"; do
+    if ! grep -qxF -- "$name" "$tmp/target.names"; then
+        stale=$((stale + 1))
+        if [ "$prune" -eq 1 ]; then
+            unset "final[$name]"
+            echo "[삭제] $name (core 가 더 이상 받지 않음)"
+        else
+            echo "[미사용] $name (core 가 더 이상 받지 않음, 지우려면 --prune)"
+        fi
+    fi
+done
+
+echo
+if [ "$skip_xc" -eq 1 ]; then
+    echo "요약: 추가 $added, 변경 승인 $changed, 변동 없음 $same, 미사용 $stale, 교차 확인 생략"
+else
+    echo "요약: 추가 $added, 변경 승인 $changed, 변동 없음 $same, 미사용 $stale, 교차 확인 일치 $xc_ok, 교차 확인 불가 $xc_na"
+fi
+
+# 새 목록 만들기
+{
+    echo "# 소스 tarball sha256 목록 (util/get-tarball 이 내려받을 때와 캐시를 쓸 때마다 대조한다)"
+    echo "# 형식: <방식>:<해시>  <출력파일명>"
+    echo "#   tar-sha256   gzip 을 푼 tar 내용의 sha256 (호스트가 압축을 다시 해도 변하지 않는다)"
+    echo "#   file-sha256  파일 바이트 그대로의 sha256 (gzip 이 아닌 파일 전용)"
+    echo "# 직접 고치지 말고 util/update-tarball-hashes 로 갱신한 뒤 변경 내용을 검토하고 커밋한다."
+    for name in "${!final[@]}"; do
+        printf '%s  %s\n' "${final[$name]}" "$name"
+    done | LC_ALL=C sort -k2,2
+} > "$tmp/new.list"
+
+echo
+if [ -f "$hashfile" ]; then
+    echo "목록 변경 내용(diff):"
+    diff -u --label "util/tarball-sha256 (현재)" --label "util/tarball-sha256 (갱신 후)" "$hashfile" "$tmp/new.list" | sed 's/^/    /'
+    [ "${PIPESTATUS[0]}" -eq 0 ] && echo "    (변경 없음)"
+else
+    echo "새 목록을 만듭니다: $hashfile ($(grep -vc '^#' "$tmp/new.list") 개 항목)"
+fi
+
+if [ "$problems" -gt 0 ]; then
+    echo >&2
+    echo "[중단] 문제 $problems 건이 있어 목록을 쓰지 않았습니다." >&2
+    exit 1
+fi
+
+if [ "$dry_run" -eq 1 ]; then
+    echo "(--dry-run 이므로 목록을 쓰지 않았습니다.)"
+    exit 0
+fi
+
+cp -- "$tmp/new.list" "$hashfile.tmp.$$" && mv -f -- "$hashfile.tmp.$$" "$hashfile" || exit 1
+echo "목록을 갱신했습니다: $hashfile"
+echo "git diff 로 변경 내용을 다시 확인한 뒤 커밋하세요."

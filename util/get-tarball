@@ -8,15 +8,35 @@ if [ ! -d $work ]; then
     mkdir $work || exit 1
 fi
 
+# 사용법: get-tarball <URL> -O <출력파일명>
+if [ $# -ne 3 ] || [ "$2" != "-O" ]; then
+    echo "사용법: get-tarball <URL> -O <출력파일명>" >&2
+    exit 2
+fi
+
 url=$1
 outfile=$3
 cachefile=$work/$outfile
-if [ -s $cachefile ]; then
-    cp $work/$outfile $outfile || exit 1
-else
-    wget $1 -O $3 || exit 1
-    if [ $? == 0 ]; then
-        cp $3 $work/ || exit 1
-    fi
-fi
 
+# 출력파일명에 경로 구분자가 있으면 work/ 밖을 건드릴 수 있으므로 거부한다.
+case "$outfile" in
+    ''|.*|*[!A-Za-z0-9._+-]*)
+        echo "[오류] 출력파일명이 올바르지 않습니다(영문, 숫자, . _ + - 만 허용): $outfile" >&2
+        exit 2
+        ;;
+esac
+
+# 받은 파일은 util/tarball-sha256 의 해시와 대조한다. 검증에 실패하면
+# verify-tarball 이 파일과 work/ 캐시를 지우고 0이 아닌 코드로 끝난다.
+if [ -s "$cachefile" ]; then
+    rm -f -- "$outfile" || exit 1
+    cp -- "$cachefile" "$outfile" || exit 1
+    "$root/util/verify-tarball" "$outfile" "$cachefile" || exit 1
+else
+    rm -f -- "$outfile" || exit 1
+    wget "$url" -O "$outfile" || { rm -f -- "$outfile"; exit 1; }
+    "$root/util/verify-tarball" "$outfile" || exit 1
+    # 검증을 통과한 파일만 캐시에 둔다.
+    cp -- "$outfile" "$work/.$outfile.$$" && mv -f -- "$work/.$outfile.$$" "$cachefile" \
+        || { rm -f -- "$work/.$outfile.$$"; exit 1; }
+fi

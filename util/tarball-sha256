@@ -1,0 +1,50 @@
+# 소스 tarball sha256 목록 (util/get-tarball 이 내려받을 때와 캐시를 쓸 때마다 대조한다)
+# 형식: <방식>:<해시>  <출력파일명>
+#   tar-sha256   gzip 을 푼 tar 내용의 sha256 (호스트가 압축을 다시 해도 변하지 않는다)
+#   file-sha256  파일 바이트 그대로의 sha256 (gzip 이 아닌 파일 전용)
+# 직접 고치지 말고 util/update-tarball-hashes 로 갱신한 뒤 변경 내용을 검토하고 커밋한다.
+tar-sha256:59d155e57d41a556402d5f384718db2e0d2644b7a97a845c217e8459fde6f9f6  LuaJIT-2.1-20261021.tar.gz
+tar-sha256:81d4fb375490a8208a11b567b086e5f612f8eb52cc8fae27cddd2b047559aa99  array-var-nginx-module-0.06.tar.gz
+tar-sha256:b502cb3396c8298626d3d8a508d05135d5c27e3c74194ff0721953d1ff31f3d6  drizzle-nginx-module-0.1.14.tar.gz
+tar-sha256:8414b62a04259eca778fa8b5afe9031538cac6c9017831503dca5e44961f1b21  echo-nginx-module-0.65.tar.gz
+tar-sha256:b369c3930311f98cd16e13db3f49fa80907feccc0412e47ce454faf66b97adee  encrypted-session-nginx-module-0.10.tar.gz
+tar-sha256:c0bd398b9e1b47705ef0ede087c3a88c7abcbf36f8c24302a9ead57653273c36  form-input-nginx-module-0.12.tar.gz
+tar-sha256:8a5425b31a633f32b010948e4ccaeb5a53826d08496f4a8aa05accdd0f36d97e  headers-more-nginx-module-0.40.tar.gz
+tar-sha256:92c1b8e808be59a5c7e066094c73048c30f42345e96edb0abba073bf548bfa05  iconv-nginx-module-0.14.tar.gz
+tar-sha256:352578426e7efb2fab34473f25103a1c992b7ed5b67f049787f6ee1a12413da9  lua-cjson-2.1.0.20.tar.gz
+tar-sha256:00cf513a5bd8f71207f3ba764a8b0945c660d10bc018b12fd9ad09b4c9c099f6  lua-nginx-module-0.10.32rc7.tar.gz
+tar-sha256:63e6c133274fad85ea1aed71bb3bcdc0a8f3a8f69b1fa44ce63a38f6fedc50bf  lua-rds-parser-0.06.tar.gz
+tar-sha256:e2055c6fa0c869ccace22c64e6206b664a4a3d376e0f25ce7ae9dc434c17098e  lua-redis-parser-0.13.tar.gz
+tar-sha256:f0f7dd71c0d844016f8d284ed043d6cfdb475eec03ecf0ea071549c9cae89359  lua-resty-core-0.1.35rc2.tar.gz
+tar-sha256:719b88b6c82052206110ef36839b32219d24f15d83f8d7c7849d755b7e4d45b9  lua-resty-dns-0.23.tar.gz
+tar-sha256:43c77d6bc9d856f38485552c512bc85bb184a6502496bde3c54c00bd02360f9e  lua-resty-limit-traffic-0.09.tar.gz
+tar-sha256:f994fe663120ba8db0229523740d83b29a1afda8848b1eece0d0c9ade4cab188  lua-resty-lock-0.09.tar.gz
+tar-sha256:59466d1dcf1ea966e75a1455ffbd2cbd53565b860bbf9409e89e42174fe9c7cd  lua-resty-lrucache-0.15.tar.gz
+tar-sha256:7a642ec735ec5c7d7a37226dd6b811af208eb5b1b6334e944e956328a40d0424  lua-resty-memcached-0.18.tar.gz
+tar-sha256:b4bacb4a9152d3105c2f8ac8391f7de4ee48db32c5b4b4dfecd17f25bbb42ce4  lua-resty-mysql-0.31.tar.gz
+tar-sha256:d2e5e6d6d44cda13416cf79c9e27e00d334b9f81c5ffcc237915ca855329d53a  lua-resty-openssl-1.9.0.tar.gz
+tar-sha256:213e90d8fd7c02f886aecbae64ddaabd0776dc67a5f3649849efa15553971947  lua-resty-redis-0.34.tar.gz
+tar-sha256:376553ea94f235c89149e9a77e2611ed0849812419de766b0adfc49130765c4a  lua-resty-rsa-1.1.1.tar.gz
+tar-sha256:ba01095e7edec72482ae7ea03638ef6132249b4a93287b80530f999224c6b08c  lua-resty-shell-0.03.tar.gz
+tar-sha256:3608abf5c40f3172e7afaf5ed58462aa66ef794a519b4a3ff6fe5533b520a5ec  lua-resty-signal-0.05.tar.gz
+tar-sha256:8e7c11f0750a14a09564089884b0242290d35a8436475bfbb29ee9a915ab3559  lua-resty-string-0.19.tar.gz
+tar-sha256:e528b83a1c34a48a834586f532936e6a7e735498804dc1d02293577652b5a4db  lua-resty-upload-0.11.tar.gz
+tar-sha256:2530041905043ec3c9b5205dfcde9b486319ef620271360e40fd32df4a6050ef  lua-resty-upstream-healthcheck-0.10.tar.gz
+tar-sha256:4ba1b0f9be0a83bc7a6229434a83b6d5582a14ad5dbf2414db05661757e04343  lua-resty-websocket-0.15.tar.gz
+tar-sha256:3086d0494dbbf00883aa0cc251b7c686d1bb6af28e4b7e6646ae4bde7cc90b32  lua-tablepool-0.03.tar.gz
+tar-sha256:c9aa5979b63f96d8df7ab00f0b18545195ce5e27458670aeb2d909719740d657  lua-upstream-nginx-module-0.08.tar.gz
+tar-sha256:73d468d05e611bec3b246733e33e0db8dc05051535a033899f69207e4764a2fd  memc-nginx-module-0.21.tar.gz
+tar-sha256:1685c06dec48a7560b9982ef2d36ebf28d4003e621ae2c04482783f962c83b3a  nginx-1.31.8.tar.gz
+tar-sha256:26260ddf6a6a996f34c1515b98ab90ad06782f858382bce8ba673a7bc4fc6073  ngx_coolkit-0.2.tar.gz
+tar-sha256:f326716a5feb9edb99c594842aecc399047e312fbde53cdb90a494b18a25bea1  ngx_devel_kit-0.3.6.tar.gz
+tar-sha256:b8496278444847360f6d99f6ea1d2efe96e521a06cf63e5169922af711fab28f  ngx_postgres-1.1.tar.gz
+tar-sha256:95b3f108677ac72f818b1e1a90123fc0efb641d65ef30ceeb3169b1ac1bbc3bb  opm-0.0.12.tar.gz
+tar-sha256:580d096660efddd6c6a6483648370e41ac9fc0b0b086beea7a716b96d11caa3d  rds-csv-nginx-module-0.10.tar.gz
+tar-sha256:30df2a70f6779a227842e8dfdea66edcb98b14fae4a6949d4242859ef444f162  rds-json-nginx-module-0.17.tar.gz
+tar-sha256:f828a757053e4e2ba7090bc0295341b3df5a0aed177b0077a46c7cc31157b8a0  redis-nginx-module-0.41.tar.gz
+tar-sha256:353b5ae0eb83a936604e2a0f9993787f60d382b48d8a6e6feea04846b4d1b026  redis2-nginx-module-0.15.tar.gz
+tar-sha256:45a782c96bf4200f949d3ff8bd83c5ee87f0106459ca3acb7643ea27888f8c67  resty-cli-0.36.tar.gz
+tar-sha256:4fb154156505911c76c0ff51ae5e088a8d2a52fc791c135b136dd5ca66064bdc  set-misc-nginx-module-0.34.tar.gz
+tar-sha256:a7026e2c39622011325d46d236a5c8e0a452a4279311d0fcf7a9a041a386075a  srcache-nginx-module-0.34.tar.gz
+tar-sha256:770e74de0d11a08530e15cbf9c76eda5ef247028301f1254c409e6d54b604f54  stream-lua-nginx-module-0.0.20rc3.tar.gz
+tar-sha256:57a7894471286c41150f9e6d91d38e453bccb88c292907788622a7b0d8d1aafb  xss-nginx-module-0.07.tar.gz
