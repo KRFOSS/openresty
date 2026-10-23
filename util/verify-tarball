@@ -20,6 +20,10 @@
 root=`perl -MCwd -e'print Cwd::abs_path(shift)' $(dirname -- "$0")/..`
 hashfile=$root/util/tarball-sha256
 
+# 해시 목록은 로케일과 상관없이 바이트로 읽는다. GNU grep 3.7(우분투 22.04 러너)은
+# UTF-8 로케일에서 한글이 든 주석 줄을 정규식 '.' 로 처리하지 못하는 경우가 있다.
+export LC_ALL=C
+
 file=$1
 cachefile=$2
 
@@ -58,7 +62,7 @@ if [ ! -f "$hashfile" ]; then
 fi
 
 # 목록 전체의 형식을 먼저 확인한다. 한 줄이라도 깨져 있으면 거부한다.
-bad=$(grep -nvE '^(#.*|(tar|file)-sha256:[0-9a-f]{64}  [A-Za-z0-9._+-]+)?$' "$hashfile" | head -n 1)
+bad=$(grep -nv '^#' "$hashfile" | grep -vE '^[0-9]+:((tar|file)-sha256:[0-9a-f]{64}  [A-Za-z0-9._+-]+)?$' | head -n 1)
 if [ -n "$bad" ]; then
     fail "해시 목록 형식이 올바르지 않습니다 ($hashfile, ${bad%%:*}번째 줄)."
 fi
