@@ -1,0 +1,54 @@
+--- a/src/core/ngx_resolver.c
++++ b/src/core/ngx_resolver.c
+@@ -152,6 +152,7 @@
+     ngx_resolver_connection_t       *rec;
+     ngx_fd_t                         fd;
+     ngx_file_t                       file;
++    ngx_str_t                        name;
+     u_char                           buf[NGX_RESOLVER_FILE_BUF_SIZE];
+     u_char                           ipv6_buf[NGX_INET6_ADDRSTRLEN];
+     ngx_uint_t                       address = 0, j, total = 0;
+@@ -180,8 +181,12 @@
+         return NGX_ERROR;
+     }
+ 
++    /* memzero 가 이름까지 지우면 읽기 실패 로그에서 NULL 을 찍다가 죽는다 */
++    name = file.name;
++
+     ngx_memzero(&file, sizeof(ngx_file_t));
+ 
++    file.name = name;
+     file.fd = fd;
+     file.log = cf->log;
+ 
+@@ -216,9 +221,19 @@
+ 
+         case sw_nameserver:
+ 
+-            if ((size_t) n - i >= sizeof("nameserver") - 1
++            /* 줄 앞의 공백과 빈 줄은 건너뛴다 */
++            if (buf[i] == ' ' || buf[i] == '\t'
++                || buf[i] == CR || buf[i] == LF)
++            {
++                break;
++            }
++
++            /* 줄의 첫 단어가 "nameserver" 이고 바로 뒤에 공백이 올 때만 쓴다 */
++            if ((size_t) n - i > sizeof("nameserver") - 1
+                 && ngx_memcmp(buf + i, "nameserver",
+-                              sizeof("nameserver") - 1) == 0)
++                              sizeof("nameserver") - 1) == 0
++                && (buf[i + sizeof("nameserver") - 1] == ' '
++                    || buf[i + sizeof("nameserver") - 1] == '\t'))
+             {
+                 state = sw_spaces;
+                 i += sizeof("nameserver") - 1;
+@@ -226,6 +241,8 @@
+                 continue;
+             }
+ 
++            state = sw_skip;
++
+             break;
+ 
+         case sw_spaces:
