@@ -3,7 +3,7 @@
 #   tar-sha256   gzip 을 푼 tar 내용의 sha256 (호스트가 압축을 다시 해도 변하지 않는다)
 #   file-sha256  파일 바이트 그대로의 sha256 (gzip 이 아닌 파일 전용)
 # 직접 고치지 말고 util/update-tarball-hashes 로 갱신한 뒤 변경 내용을 검토하고 커밋한다.
-tar-sha256:59d155e57d41a556402d5f384718db2e0d2644b7a97a845c217e8459fde6f9f6  LuaJIT-2.1-20261021.tar.gz
+tar-sha256:9d9be4f7301fabb495f531bba7205dee49b3c501c7a0bd9de752324d8c982d0a  LuaJIT-2.1-20261023.tar.gz
 tar-sha256:81d4fb375490a8208a11b567b086e5f612f8eb52cc8fae27cddd2b047559aa99  array-var-nginx-module-0.06.tar.gz
 tar-sha256:b502cb3396c8298626d3d8a508d05135d5c27e3c74194ff0721953d1ff31f3d6  drizzle-nginx-module-0.1.14.tar.gz
 tar-sha256:8414b62a04259eca778fa8b5afe9031538cac6c9017831503dca5e44961f1b21  echo-nginx-module-0.65.tar.gz
@@ -16,7 +16,7 @@ tar-sha256:00cf513a5bd8f71207f3ba764a8b0945c660d10bc018b12fd9ad09b4c9c099f6  lua
 tar-sha256:63e6c133274fad85ea1aed71bb3bcdc0a8f3a8f69b1fa44ce63a38f6fedc50bf  lua-rds-parser-0.06.tar.gz
 tar-sha256:e2055c6fa0c869ccace22c64e6206b664a4a3d376e0f25ce7ae9dc434c17098e  lua-redis-parser-0.13.tar.gz
 tar-sha256:f0f7dd71c0d844016f8d284ed043d6cfdb475eec03ecf0ea071549c9cae89359  lua-resty-core-0.1.35rc2.tar.gz
-tar-sha256:719b88b6c82052206110ef36839b32219d24f15d83f8d7c7849d755b7e4d45b9  lua-resty-dns-0.23.tar.gz
+tar-sha256:d8ce2e02fa4a3161d12f1f9040b1817956667d5f033e6ff42502cdce1747fd53  lua-resty-dns-0.24.tar.gz
 tar-sha256:43c77d6bc9d856f38485552c512bc85bb184a6502496bde3c54c00bd02360f9e  lua-resty-limit-traffic-0.09.tar.gz
 tar-sha256:f994fe663120ba8db0229523740d83b29a1afda8848b1eece0d0c9ade4cab188  lua-resty-lock-0.09.tar.gz
 tar-sha256:59466d1dcf1ea966e75a1455ffbd2cbd53565b860bbf9409e89e42174fe9c7cd  lua-resty-lrucache-0.15.tar.gz
@@ -30,7 +30,7 @@ tar-sha256:3608abf5c40f3172e7afaf5ed58462aa66ef794a519b4a3ff6fe5533b520a5ec  lua
 tar-sha256:8e7c11f0750a14a09564089884b0242290d35a8436475bfbb29ee9a915ab3559  lua-resty-string-0.19.tar.gz
 tar-sha256:e528b83a1c34a48a834586f532936e6a7e735498804dc1d02293577652b5a4db  lua-resty-upload-0.11.tar.gz
 tar-sha256:2530041905043ec3c9b5205dfcde9b486319ef620271360e40fd32df4a6050ef  lua-resty-upstream-healthcheck-0.10.tar.gz
-tar-sha256:4ba1b0f9be0a83bc7a6229434a83b6d5582a14ad5dbf2414db05661757e04343  lua-resty-websocket-0.15.tar.gz
+tar-sha256:adfce51cf8fd726850fed7391850c1a83ef723cf5af9e1fcd9b6341f4403739a  lua-resty-websocket-0.16.tar.gz
 tar-sha256:3086d0494dbbf00883aa0cc251b7c686d1bb6af28e4b7e6646ae4bde7cc90b32  lua-tablepool-0.03.tar.gz
 tar-sha256:c9aa5979b63f96d8df7ab00f0b18545195ce5e27458670aeb2d909719740d657  lua-upstream-nginx-module-0.08.tar.gz
 tar-sha256:73d468d05e611bec3b246733e33e0db8dc05051535a033899f69207e4764a2fd  memc-nginx-module-0.21.tar.gz
