@@ -17,6 +17,10 @@ if (!-x $openresty) {
 
 plan skip_all => 'OpenResty binary is not available' unless -x $openresty;
 
+# 오류 로그는 바이트로 오므로 비교용 문자열도 UTF-8 바이트로 만든다.
+my $msg_ok = pack 'C*', 0xec, 0x84, 0xb1, 0xea, 0xb3, 0xb5;
+my $msg_deny = pack 'C*', 0xea, 0xb1, 0xb0, 0xeb, 0xb6, 0x80;
+
 # 더미 프로세스를 마스터인 것처럼 PID 파일에 기록한 뒤 신호를 보낸다.
 # 더미가 죽었으면 신호가 전달된 것이고, 살아 있으면 전달되지 않은 것이다.
 sub run_signal_test {
@@ -58,9 +62,11 @@ sub run_signal_test {
     run3 \@cmd, undef, \$stdout, \$stderr;
     my $exit = $? >> 8;
 
-    # 신호를 받은 더미가 종료될 때까지 잠깐 기다린다.
+    # 신호를 받은 더미가 종료될 때까지 기다린다.
+    # 부하가 높은 러너에서는 2초(0.1 x 20)로는 전달 확인을 놓치는 경우가 있어
+    # 5초(0.1 x 50)로 넉넉히 잡는다. 신호를 보내지 않는 시험은 결과가 같다.
     my $delivered = 0;
-    for (1 .. 20) {
+    for (1 .. 50) {
         if (waitpid($dummy, WNOHANG) == $dummy) {
             $delivered = 1;
             last;
@@ -98,7 +104,7 @@ CONF
 
     is $exit, 0, 'valid configuration allows a reload';
     ok $delivered, 'the reload signal reaches the master process';
-    like $stderr, qr/성공/, 'the passing check is reported';
+    ok index($stderr, $msg_ok) >= 0, 'the passing check is reported';
 }
 
 {
@@ -121,7 +127,7 @@ CONF
     isnt $exit, 0, 'a Lua syntax error refuses the reload';
     ok !$delivered, 'no reload signal is sent when the Lua check fails';
     like $stderr, qr/Lua/, 'the Lua syntax error is reported';
-    like $stderr, qr/거부/, 'the refusal is reported';
+    ok index($stderr, $msg_deny) >= 0, 'the refusal is reported';
 }
 
 {
@@ -136,7 +142,7 @@ CONF
 
     isnt $exit, 0, 'a missing Lua file refuses the reload';
     ok !$delivered, 'no reload signal is sent when a Lua file is missing';
-    like $stderr, qr/거부/, 'the refusal is reported';
+    ok index($stderr, $msg_deny) >= 0, 'the refusal is reported';
 }
 
 {
@@ -154,7 +160,7 @@ CONF
 
     isnt $exit, 0, 'an nginx syntax error refuses the reload';
     ok !$delivered, 'no reload signal is sent when the nginx syntax is invalid';
-    like $stderr, qr/거부/, 'the refusal is reported';
+    ok index($stderr, $msg_deny) >= 0, 'the refusal is reported';
 }
 
 {
@@ -197,7 +203,7 @@ CONF
     isnt $exit, 0, 'a Stream Lua syntax error refuses the reload';
     ok !$delivered, 'no reload signal is sent when the Stream Lua check fails';
     like $stderr, qr/Stream Lua/, 'the Stream Lua syntax error is reported';
-    like $stderr, qr/거부/, 'the Stream Lua reload refusal is reported';
+    ok index($stderr, $msg_deny) >= 0, 'the Stream Lua reload refusal is reported';
 }
 
 done_testing();
