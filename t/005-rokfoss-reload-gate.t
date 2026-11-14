@@ -44,11 +44,20 @@ sub run_signal_test {
     print {$fh} $config;
     close $fh;
 
+    # 자식이 SIGHUP 을 받으면 표식 파일을 남긴다. 프로세스 종료 여부만 보면
+    # 자식이 먼저 회수되었을 때 신호 전달을 놓칠 수 있다.
+    my $marker = File::Spec->catfile($dir, 'hup.marker');
+
     my $dummy = fork();
     die "cannot fork: $!" unless defined $dummy;
 
     if ($dummy == 0) {
-        exec 'sleep', '300';
+        # nohup 처럼 부모가 SIGHUP 을 무시한 채 띄운 경우 자식도 무시 상태를
+        # 물려받아 신호를 받지 못한다. 기본 처리로 되돌린 뒤 trap 을 건다.
+        $SIG{HUP} = 'DEFAULT';
+
+        exec '/bin/sh', '-c',
+            "trap 'echo hup > \"$marker\"; exit 0' HUP; while :; do sleep 0.05; done";
         exit 1;
     }
 
@@ -63,10 +72,15 @@ sub run_signal_test {
     my $exit = $? >> 8;
 
     # 신호를 받은 더미가 종료될 때까지 기다린다.
-    # 부하가 높은 러너에서는 2초(0.1 x 20)로는 전달 확인을 놓치는 경우가 있어
-    # 5초(0.1 x 50)로 넉넉히 잡는다. 신호를 보내지 않는 시험은 결과가 같다.
+    # 신호를 받으면 표식 파일이 남으므로 종료 여부에만 기대지 않는다.
+    # 3초(0.1 x 30)면 충분하고, 신호를 보내지 않는 시험은 결과가 같다.
     my $delivered = 0;
-    for (1 .. 50) {
+    for (1 .. 30) {
+        if (-e $marker) {
+            $delivered = 1;
+            last;
+        }
+
         if (waitpid($dummy, WNOHANG) == $dummy) {
             $delivered = 1;
             last;
