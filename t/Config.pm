@@ -28,7 +28,7 @@ sub normalize_bundle_versions ($) {
     # The sanity tests should validate the generated command structure without
     # duplicating those version pins in every expected stdout/Makefile block.
     $text =~ s/\bLuaJIT-2\.1-\d+\b/LuaJIT-2.1-<VERSION>/g;
-    $text =~ s/\b(lua-cjson|nginx|ngx_devel_kit|ngx_lua|ngx_stream_lua|resty-cli)-\d+(?:\.\d+)+(?:rc\d+)?\b/$1-<VERSION>/g;
+    $text =~ s/\b(lua-cjson|lua-resty-openssl-aux-module|nginx|ngx_devel_kit|ngx_lua|ngx_stream_lua|resty-cli)-\d+(?:\.\d+)+(?:rc\d+)?\b/$1-<VERSION>/g;
 
     return $text;
 }
