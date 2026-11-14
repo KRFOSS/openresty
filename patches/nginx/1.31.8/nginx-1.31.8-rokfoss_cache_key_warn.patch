@@ -1,0 +1,123 @@
+--- a/src/http/ngx_http.h
++++ b/src/http/ngx_http.h
+@@ -189,6 +189,10 @@
+ #endif
+ 
+ 
++void ngx_http_rokfoss_cache_key_warn(ngx_conf_t *cf, ngx_str_t *directive,
++    ngx_str_t *key);
++
++
+ extern ngx_module_t  ngx_http_module;
+ 
+ extern ngx_str_t  ngx_http_html_default_types[];
+--- a/src/http/ngx_http_core_module.c
++++ b/src/http/ngx_http_core_module.c
+@@ -5628,3 +5628,63 @@
+ 
+     return NGX_CONF_OK;
+ }
++
++
++void
++ngx_http_rokfoss_cache_key_warn(ngx_conf_t *cf, ngx_str_t *directive,
++    ngx_str_t *key)
++{
++    u_char      *p, *last, *name;
++    size_t       len;
++    ngx_uint_t   braced;
++
++    p = key->data;
++    last = key->data + key->len;
++
++    while (p < last) {
++
++        p = ngx_strlchr(p, last, '$');
++        if (p == NULL) {
++            return;
++        }
++
++        p++;
++
++        if (p < last && *p == '{') {
++            braced = 1;
++            p++;
++
++        } else {
++            braced = 0;
++        }
++
++        name = p;
++
++        while (p < last
++               && ((*p >= 'a' && *p <= 'z')
++                   || (*p >= 'A' && *p <= 'Z')
++                   || (*p >= '0' && *p <= '9')
++                   || *p == '_'))
++        {
++            p++;
++        }
++
++        len = p - name;
++
++        if (braced && p < last && *p == '}') {
++            p++;
++        }
++
++        if ((len == 3 && ngx_strncmp(name, "uri", 3) == 0)
++            || (len == 12 && ngx_strncmp(name, "document_uri", 12) == 0))
++        {
++            ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
++                "주의: %V 에 $uri 를 쓰면 정규화된 경로로 캐시 키가 만들어져 "
++                "위험이 있을 수 있으니 보안상 $request_uri 로 수정하는 것을 "
++                "권장합니다",
++                directive);
++
++            return;
++        }
++    }
++}
+--- a/src/http/modules/ngx_http_proxy_module.c
++++ b/src/http/modules/ngx_http_proxy_module.c
+@@ -5123,6 +5123,8 @@
+         return NGX_CONF_ERROR;
+     }
+ 
++    ngx_http_rokfoss_cache_key_warn(cf, &cmd->name, &value[1]);
++
+     return NGX_CONF_OK;
+ }
+ 
+--- a/src/http/modules/ngx_http_fastcgi_module.c
++++ b/src/http/modules/ngx_http_fastcgi_module.c
+@@ -3967,6 +3967,8 @@
+         return NGX_CONF_ERROR;
+     }
+ 
++    ngx_http_rokfoss_cache_key_warn(cf, &cmd->name, &value[1]);
++
+     return NGX_CONF_OK;
+ }
+ 
+--- a/src/http/modules/ngx_http_uwsgi_module.c
++++ b/src/http/modules/ngx_http_uwsgi_module.c
+@@ -2524,6 +2524,8 @@
+         return NGX_CONF_ERROR;
+     }
+ 
++    ngx_http_rokfoss_cache_key_warn(cf, &cmd->name, &value[1]);
++
+     return NGX_CONF_OK;
+ }
+ 
+--- a/src/http/modules/ngx_http_scgi_module.c
++++ b/src/http/modules/ngx_http_scgi_module.c
+@@ -2173,6 +2173,8 @@
+         return NGX_CONF_ERROR;
+     }
+ 
++    ngx_http_rokfoss_cache_key_warn(cf, &cmd->name, &value[1]);
++
+     return NGX_CONF_OK;
+ }
+ 
