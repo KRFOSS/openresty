@@ -3,7 +3,7 @@
 #   tar-sha256   gzip 을 푼 tar 내용의 sha256 (호스트가 압축을 다시 해도 변하지 않는다)
 #   file-sha256  파일 바이트 그대로의 sha256 (gzip 이 아닌 파일 전용)
 # 직접 고치지 말고 util/update-tarball-hashes 로 갱신한 뒤 변경 내용을 검토하고 커밋한다.
-tar-sha256:9d9be4f7301fabb495f531bba7205dee49b3c501c7a0bd9de752324d8c982d0a  LuaJIT-2.1-20261023.tar.gz
+tar-sha256:8ec8a37ce37defa2bfeb99f13f358e8db72b72f7e138bfb550749fcdc6648470  LuaJIT-2.1-20261107.tar.gz
 tar-sha256:81d4fb375490a8208a11b567b086e5f612f8eb52cc8fae27cddd2b047559aa99  array-var-nginx-module-0.06.tar.gz
 tar-sha256:b502cb3396c8298626d3d8a508d05135d5c27e3c74194ff0721953d1ff31f3d6  drizzle-nginx-module-0.1.14.tar.gz
 tar-sha256:8414b62a04259eca778fa8b5afe9031538cac6c9017831503dca5e44961f1b21  echo-nginx-module-0.65.tar.gz
@@ -23,6 +23,7 @@ tar-sha256:59466d1dcf1ea966e75a1455ffbd2cbd53565b860bbf9409e89e42174fe9c7cd  lua
 tar-sha256:7a642ec735ec5c7d7a37226dd6b811af208eb5b1b6334e944e956328a40d0424  lua-resty-memcached-0.18.tar.gz
 tar-sha256:b4bacb4a9152d3105c2f8ac8391f7de4ee48db32c5b4b4dfecd17f25bbb42ce4  lua-resty-mysql-0.31.tar.gz
 tar-sha256:d2e5e6d6d44cda13416cf79c9e27e00d334b9f81c5ffcc237915ca855329d53a  lua-resty-openssl-1.9.0.tar.gz
+tar-sha256:07eced6916e96d66db0f416e42d3db2149cdbd0bfa72065291c803c7b26a7ef1  lua-resty-openssl-aux-module-0.3.0.tar.gz
 tar-sha256:213e90d8fd7c02f886aecbae64ddaabd0776dc67a5f3649849efa15553971947  lua-resty-redis-0.34.tar.gz
 tar-sha256:376553ea94f235c89149e9a77e2611ed0849812419de766b0adfc49130765c4a  lua-resty-rsa-1.1.1.tar.gz
 tar-sha256:ba01095e7edec72482ae7ea03638ef6132249b4a93287b80530f999224c6b08c  lua-resty-shell-0.03.tar.gz
