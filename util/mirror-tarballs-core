@@ -510,41 +510,41 @@ if [ "$answer" = "Y" ]; then
     answer=`$root/util/ver-ge "$main_ver" 1.21.0`
     if [ "$answer" = "N" ]; then
         echo "$info_txt applying the patch for nginx security issue https://hackerone.com/reports/513236"
-        patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-static_mod_escape_loc_hdr.patch
+        patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-static_mod_escape_loc_hdr.patch || exit 1
         echo
     fi
 fi
 
 echo "$info_txt applying the always_enable_cc_feature_tests patch to nginx"
-patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-always_enable_cc_feature_tests.patch
+patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-always_enable_cc_feature_tests.patch || exit 1
 echo
 
 echo "$info_txt applying the ssl_cert_cb_yield.patch patch to nginx"
-patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-ssl_cert_cb_yield.patch
+patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-ssl_cert_cb_yield.patch || exit 1
 echo
 
 answer=`$root/util/ver-ge "$main_ver" 1.17.1`
 if [ "$answer" = "N" ]; then
     echo "$info_txt applying the ssl_pending_session.patch patch to nginx"
-    patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-ssl_pending_session.patch
+    patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-ssl_pending_session.patch || exit 1
     echo
 else
     echo "$info_txt applying the ssl_sess_cb_yield.patch patch to nginx"
-    patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-ssl_sess_cb_yield.patch
+    patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-ssl_sess_cb_yield.patch || exit 1
     echo
 fi
 
 answer=`$root/util/ver-ge "$main_ver" 1.19.9`
 if [ "$answer" = "Y" ]; then
     echo "$info_txt applying the ssl_client_hello_cb_yield.patch patch to nginx"
-    patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-ssl_client_hello_cb_yield.patch
+    patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-ssl_client_hello_cb_yield.patch || exit 1
     echo
 fi
 
 answer=`$root/util/ver-ge "$main_ver" 1.27.1`
 if [ "$answer" = "Y" ]; then
     echo "$info_txt applying the proxy_ssl_verify_cb_yield.patch patch to nginx"
-    patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-proxy_ssl_verify_cb_yield.patch
+    patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-proxy_ssl_verify_cb_yield.patch || exit 1
     echo
 fi
 
@@ -1182,6 +1182,15 @@ cd ..
 
 #################################
 
+# 패치 실패 흔적인 .rej 파일이 남았으면 배포 산출물을 만들지 않는다.
+rej_files=`find "$bundle_dir" -name '*.rej' -print`
+if [ -n "$rej_files" ]; then
+    rej_count=`printf '%s\n' "$rej_files" | wc -l`
+    echo "오류: 패치 적용 후 .rej 파일이 $rej_count개 남았습니다. 빌드를 중단합니다." >&2
+    printf '%s\n' "$rej_files" >&2
+    exit 1
+fi
+
 rm *.tar.gz
 rm -fr *.tar.bz2
 
@@ -1297,6 +1306,7 @@ cd $curdir || exit 1
 find bundle -name '*~' -delete
 find bundle -name '.*' -exec rm -rv {} +
 find bundle -name '*.orig' -delete
+find bundle -name '*.rej' -delete
 #find bundle -name '*.yml' -delete
 #find bundle -name '*.ini' -delete
 #find bundle -name '*.sql' -delete
