@@ -1,6 +1,7 @@
-nginx 본가 master 커밋 2개를 1.31.8 에 앞당겨 적용한다. 다음 nginx 판에 들어오면 이 패치를 지운다.
+nginx 본가 master 커밋 3개를 1.31.8 에 앞당겨 적용한다. 다음 nginx 판에 들어오면 이 패치를 지운다.
  a4b4822 Request body: flood detection for chunked request body
  d17f1d2 Map: fixed regex pattern lifetime
+ da92f58 Disabled handling of headers without a colon
 --- a/src/http/ngx_http_request_body.c
 +++ b/src/http/ngx_http_request_body.c
 @@ -1090,6 +1090,7 @@
@@ -74,3 +75,27 @@ nginx 본가 master 커밋 2개를 1.31.8 에 앞당겨 적용한다. 다음 ngi
          rc.err.len = NGX_MAX_CONF_ERRSTR;
          rc.err.data = errstr;
  
+--- a/src/http/ngx_http_parse.c
++++ b/src/http/ngx_http_parse.c
+@@ -989,21 +989,6 @@
+                 break;
+             }
+ 
+-            if (ch == CR) {
+-                r->header_name_end = p;
+-                r->header_start = p;
+-                r->header_end = p;
+-                state = sw_almost_done;
+-                break;
+-            }
+-
+-            if (ch == LF) {
+-                r->header_name_end = p;
+-                r->header_start = p;
+-                r->header_end = p;
+-                goto done;
+-            }
+-
+             /* IIS may send the duplicate "HTTP/1.1 ..." lines */
+             if (ch == '/'
+                 && r->upstream
