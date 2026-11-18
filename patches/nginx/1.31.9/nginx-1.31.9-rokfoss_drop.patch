@@ -196,3 +196,45 @@ index c07f2a5..8dad6fd 100644
      if (r->keepalive) {
          switch (error) {
              case NGX_HTTP_BAD_REQUEST:
+
+diff --git a/src/http/ngx_http_script.c b/src/http/ngx_http_script.c
+--- a/src/http/ngx_http_script.c
++++ b/src/http/ngx_http_script.c
+@@ -1570,10 +1570,37 @@
+ void
+ ngx_http_script_return_code(ngx_http_script_engine_t *e)
+ {
++    ngx_http_core_loc_conf_t       *clcf;
+     ngx_http_script_return_code_t  *code;
+ 
+     code = (ngx_http_script_return_code_t *) e->ip;
+ 
++    /*
++     * ROKFOSS: if 로 켜진 drop_all 은 return 보다 먼저다.
++     *
++     * return 은 rewrite 단계에서 요청을 즉시 finalize 하므로 preaccess 의
++     * drop_all 검문에 닿지 않는다. 그러면 "if (...) { drop_all on; }" 뒤에
++     * return 을 둔 설정에서, 드롭하려던 요청이 그대로 응답된다.
++     * 같은 판정을 return 실행 전에 한 번 더 해 그 구멍을 막는다.
++     * drop_all 이 꺼진 곳에서는 아무 동작도 바뀌지 않는다.
++     */
++    clcf = ngx_http_get_module_loc_conf(e->request, ngx_http_core_module);
++
++    if (clcf->drop_all) {
++        ngx_log_error(NGX_LOG_INFO, e->request->connection->log, 0,
++                      "dropped by drop_all: \"%V?%V\"",
++                      &e->request->uri, &e->request->args);
++
++        e->request->err_status = NGX_HTTP_ROKFOSS_DROP;
++        e->request->keepalive = 0;
++        e->request->lingering_close = 0;
++
++        e->status = NGX_HTTP_CLOSE;
++        e->ip = ngx_http_script_exit;
++
++        return;
++    }
++
+     if (code->status < NGX_HTTP_BAD_REQUEST
+         || code->text.value.len
+         || code->text.lengths)
