@@ -48,7 +48,7 @@ fi
 #################################
 
 ver="$main_ver"
-$root/util/get-tarball "https://openresty.org/download/nginx-$ver.tar.gz" -O nginx-$ver.tar.gz || exit 1
+$root/util/get-tarball "https://nginx.org/download/nginx-$ver.tar.gz" -O nginx-$ver.tar.gz || exit 1
 tar -xzf nginx-$ver.tar.gz || exit 1
 cd nginx-$ver || exit 1
 
@@ -209,9 +209,6 @@ echo "$info_txt applying the ROKFOSS resolver resolv.conf parsing fix patch"
 patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_resolver_fix.patch || exit 1
 echo
 
-echo "$info_txt applying the ROKFOSS nginx master backport patch"
-patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_nginx_backport.patch || exit 1
-echo
 
 #patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-redirect_memcpy_overlap.patch || exit 1
 
@@ -756,8 +753,8 @@ echo "$info_txt applying the ROKFOSS cache key advice patch for nginx"
 patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_cache_key_warn.patch || exit 1
 echo
 
-cp $root/html/index.html docs/html/ || exit 1
-cp $root/html/50x.html docs/html/ || exit 1
+cp $root/html/index.html html/ || exit 1
+cp $root/html/50x.html html/ || exit 1
 
 cd .. || exit 1
 

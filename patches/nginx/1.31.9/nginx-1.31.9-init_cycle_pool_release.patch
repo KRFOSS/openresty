@@ -1,0 +1,63 @@
+diff --git a/src/core/nginx.c b/src/core/nginx.c
+index a71d4ce..5ceef9e 100644
+--- a/src/core/nginx.c
++++ b/src/core/nginx.c
+@@ -191,6 +191,7 @@ static u_char      *ngx_conf_params;
+ static u_char      *ngx_control_addr;
+ #endif
+ static char        *ngx_signal;
++ngx_pool_t         *saved_init_cycle_pool = NULL;
+ 
+ 
+ static char **ngx_os_environ;
+@@ -259,6 +260,8 @@ main(int argc, char *const *argv)
+         return 1;
+     }
+ 
++    saved_init_cycle_pool = init_cycle.pool;
++
+     if (ngx_save_argv(&init_cycle, argc, argv) != NGX_OK) {
+         return 1;
+     }
+diff --git a/src/core/ngx_core.h b/src/core/ngx_core.h
+index cbc4c02..b83915b 100644
+--- a/src/core/ngx_core.h
++++ b/src/core/ngx_core.h
+@@ -124,4 +124,6 @@ void ngx_cpuinfo(void);
+ #define NGX_DISABLE_SYMLINKS_NOTOWNER   2
+ #endif
+ 
++extern ngx_pool_t        *saved_init_cycle_pool;
++
+ #endif /* _NGX_CORE_H_INCLUDED_ */
+diff --git a/src/core/ngx_cycle.c b/src/core/ngx_cycle.c
+index 410cc3c..8560797 100644
+--- a/src/core/ngx_cycle.c
++++ b/src/core/ngx_cycle.c
+@@ -782,6 +782,10 @@ old_shm_zone_done:
+ 
+     if (ngx_process == NGX_PROCESS_MASTER || ngx_is_init_cycle(old_cycle)) {
+ 
++        if (ngx_is_init_cycle(old_cycle)) {
++            saved_init_cycle_pool = NULL;
++        }
++
+         ngx_destroy_pool(old_cycle->pool);
+         cycle->old_cycle = NULL;
+ 
+diff --git a/src/os/unix/ngx_process_cycle.c b/src/os/unix/ngx_process_cycle.c
+index c633830..7356d93 100644
+--- a/src/os/unix/ngx_process_cycle.c
++++ b/src/os/unix/ngx_process_cycle.c
+@@ -719,6 +719,11 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
+     ngx_exit_cycle.files_n = ngx_cycle->files_n;
+     ngx_cycle = &ngx_exit_cycle;
+ 
++    if (saved_init_cycle_pool != NULL && saved_init_cycle_pool != cycle->pool) {
++        ngx_destroy_pool(saved_init_cycle_pool);
++        saved_init_cycle_pool = NULL;
++    }
++
+     ngx_destroy_pool(cycle->pool);
+ 
+     exit(0);

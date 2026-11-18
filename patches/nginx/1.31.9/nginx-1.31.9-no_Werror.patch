@@ -1,0 +1,39 @@
+diff --git a/auto/cc/clang b/auto/cc/clang
+index 73b3f94..8940ad9 100644
+--- a/auto/cc/clang
++++ b/auto/cc/clang
+@@ -80,7 +80,7 @@ if [ "$NGX_SYSTEM" = "Darwin" ]; then
+ fi
+ 
+ # stop on warning
+-CFLAGS="$CFLAGS -Werror"
++#CFLAGS="$CFLAGS -Werror"
+ 
+ # debug
+ CFLAGS="$CFLAGS -g"
+diff --git a/auto/cc/gcc b/auto/cc/gcc
+index debd0eb..412d50d 100644
+--- a/auto/cc/gcc
++++ b/auto/cc/gcc
+@@ -158,7 +158,7 @@ esac
+ 
+ 
+ # stop on warning
+-CFLAGS="$CFLAGS -Werror"
++#CFLAGS="$CFLAGS -Werror"
+ 
+ # debug
+ CFLAGS="$CFLAGS -g"
+diff --git a/auto/cc/icc b/auto/cc/icc
+index 9694642..214bdae 100644
+--- a/auto/cc/icc
++++ b/auto/cc/icc
+@@ -103,7 +103,7 @@ case "$NGX_CC_VER" in
+ esac
+ 
+ # stop on warning
+-CFLAGS="$CFLAGS -Werror"
++#CFLAGS="$CFLAGS -Werror"
+ 
+ # debug
+ CFLAGS="$CFLAGS -g"
