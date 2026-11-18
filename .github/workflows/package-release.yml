@@ -55,7 +55,7 @@ jobs:
 
     steps:
       - name: 소스 체크아웃
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
@@ -127,7 +127,7 @@ jobs:
         run: mkdir -p download-cache
 
       - name: 소스 아카이브 캐시
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: download-cache
           key: package-release-${{ matrix.goarch }}-${{ env.PCRE_VER }}-${{ env.OPENSSL_VER }}-${{ hashFiles('util/mirror-tarballs') }}
@@ -315,7 +315,7 @@ jobs:
           subject-path: release/*
 
       - name: 패키지 아티팩트 업로드
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: packages-${{ matrix.goarch }}
           path: release/*
@@ -331,7 +331,7 @@ jobs:
 
     steps:
       - name: 패키지 아티팩트 다운로드
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           pattern: packages-*
           path: release
