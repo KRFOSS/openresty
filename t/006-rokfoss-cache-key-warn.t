@@ -99,6 +99,37 @@ my @cases = (
         rc    => 0,
         warn  => 0,
     },
+    {
+        name  => '대문자 $URI 도 경고한다',
+        body  => 'proxy_cache_key "$URI";',
+        rc    => 0,
+        warn  => 1,
+        instr => 'proxy_cache_key',
+    },
+    {
+        name  => '대문자 중괄호 표기 ${URI} 도 경고한다',
+        body  => 'proxy_cache_key "${URI}";',
+        rc    => 0,
+        warn  => 1,
+    },
+    {
+        name  => '$Document_URI 도 경고한다',
+        body  => 'proxy_cache_key "$Document_URI";',
+        rc    => 0,
+        warn  => 1,
+    },
+    {
+        name  => '$request_uri 는 경고하지 않는다',
+        body  => 'proxy_cache_key "$request_uri";',
+        rc    => 0,
+        warn  => 0,
+    },
+    {
+        name  => 'add_header X-Test 의 $uri 는 경고 대상이 아니다',
+        body  => 'add_header X-Test "$uri";',
+        rc    => 0,
+        warn  => 0,
+    },
 );
 
 plan tests => scalar @cases * 3;
