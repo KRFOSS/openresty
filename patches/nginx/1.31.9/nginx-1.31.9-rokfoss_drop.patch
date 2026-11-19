@@ -1,16 +1,18 @@
 diff --git a/src/http/ngx_http_core_module.c b/src/http/ngx_http_core_module.c
-index 30ae6e0..e3a82e8 100644
+index 30ae6e0..9ca9aa9 100644
 --- a/src/http/ngx_http_core_module.c
 +++ b/src/http/ngx_http_core_module.c
-@@ -30,6 +30,7 @@ static ngx_int_t ngx_http_core_find_static_location(ngx_http_request_t *r,
+@@ -30,6 +30,9 @@
  
  static ngx_int_t ngx_http_core_preconfiguration(ngx_conf_t *cf);
  static ngx_int_t ngx_http_core_postconfiguration(ngx_conf_t *cf);
 +static ngx_int_t ngx_http_rokfoss_drop_handler(ngx_http_request_t *r);
++static ngx_int_t ngx_http_rokfoss_should_drop(ngx_http_request_t *r,
++    ngx_http_core_loc_conf_t *clcf);
  static void *ngx_http_core_create_main_conf(ngx_conf_t *cf);
  static char *ngx_http_core_init_main_conf(ngx_conf_t *cf, void *conf);
  static void *ngx_http_core_create_srv_conf(ngx_conf_t *cf);
-@@ -614,6 +615,14 @@ static ngx_command_t  ngx_http_core_commands[] = {
+@@ -614,6 +617,14 @@
        offsetof(ngx_http_core_loc_conf_t, port_in_redirect),
        NULL },
  
@@ -25,18 +27,22 @@ index 30ae6e0..e3a82e8 100644
      { ngx_string("msie_padding"),
        NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
        ngx_conf_set_flag_slot,
-@@ -1009,6 +1018,31 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
+@@ -1009,6 +1020,35 @@
  
      ngx_http_update_location_config(r);
  
 +    /*
 +     * ROKFOSS: drop_all 이 켜진 곳으로 온 요청은 여기서 끝낸다.
 +     *
-+     * location 이 확정된 직후이자 본문을 읽기 전이므로, 본문이 아무리
-+     * 커도 읽지 않고 끊는다. 응답도 만들지 않는다.
-+     * access log 에는 999 로 남는다.
++     * location 이 확정된 직후이자 본문을 읽기 전이므로, 일반 요청은
++     * 응답을 만들지 않고 끊는다. access log 에는 999 로 남는다.
++     *
++     * 단, 본문 크기를 선언한 요청이 client_max_body_size 를 넘으면
++     * ngx_http_rokfoss_should_drop() 이 0 을 돌려 드롭하지 않는다.
++     * nginx 가 정상 413 오류 페이지를 내어 용량 초과 사용자가 이유를
++     * 알 수 있게 한다. 크기를 모르는 청크 본문(-1)은 여전히 드롭한다.
 +     */
-+    if (clcf->drop_all) {
++    if (ngx_http_rokfoss_should_drop(r, clcf)) {
 +        if (r->args.len) {
 +            ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
 +                          "dropped by drop_all: \"%V?%V\"", &r->uri, &r->args);
@@ -57,7 +63,7 @@ index 30ae6e0..e3a82e8 100644
      ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                     "http cl:%O max:%O",
                     r->headers_in.content_length_n, clcf->client_max_body_size);
-@@ -3508,12 +3536,64 @@ ngx_http_core_preconfiguration(ngx_conf_t *cf)
+@@ -3508,12 +3548,107 @@
  static ngx_int_t
  ngx_http_core_postconfiguration(ngx_conf_t *cf)
  {
@@ -73,6 +79,7 @@ index 30ae6e0..e3a82e8 100644
 +     * 은 못 본다. preaccess 는 rewrite/if 평가가 끝난 뒤라, if 가 matched 되어
 +     * loc_conf 가 교체된 상태를 본다. 그래서 여기서 다시 확인하면
 +     * "if (...) { drop_all on; }" 도 동작한다. 본문을 읽기 전이라 조기 종료.
++     * find_config 의 드롭과 같은 판정을 써서 413 예외도 동일하게 적용한다.
 +     */
 +    cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
 +
@@ -88,6 +95,48 @@ index 30ae6e0..e3a82e8 100644
  
  
 +/*
++ * ROKFOSS: drop_all 공통 판정. 끊어야 하면 1, 통과시키면 0 을 돌려준다.
++ *
++ *  - drop_all 이 꺼진 곳: 항상 0. 순정 nginx 와 동작이 1바이트도 다르지 않다.
++ *  - 본문 크기를 선언했고(r->headers_in.content_length_n != -1) 그 값이
++ *    client_max_body_size 를 넘으면 0. 드롭하지 않고 nginx 가 정상 413
++ *    오류 페이지를 돌려준다. "413(본문 초과)은 제외한다, 용량을 넘겨
++ *    업로드하는 정상 사용자에게는 이유를 알려주어야 한다"는 패치 주석의
++ *    의도를 실제 동작과 일치시키는 예외다. client_max_body_size 가 0이면
++ *    무제한이므로 이 분기에 들어가지 않는다.
++ *  - 청크 인코딩처럼 크기를 모르는 본문(content_length_n == -1)은 1.
++ *    사전에 초과 여부를 알 수 없고, 스캐너 트래픽을 조용히 차단하는 목적이
++ *    우선이므로 지금처럼 드롭한다.
++ *  - GET/HEAD 처럼 본문이 없는 요청, 한도 이내의 본문도 1 (기존 드롭 유지).
++ *
++ * nginx 의 413 검문은 find_config 단계에서 이 판정 바로 뒤에 있다. 따라서
++ * find_config 를 지나는 요청은 큰 본문 선언이면 413 이 되고, 같은 location
++ * 의 return 보다 413 이 먼저 이긴다. 반면 이름있는 location 처럼
++ * find_config 를 건너뛰는 경로는 nginx 413 검문을 타지 않아 return 경로의
++ * 기존 드롭이 그대로 살아 있다. 이 차이는 nginx 단계 순서의 결과이며
++ * 의도된 동작이다. rewrite 의 return 과 special_response 의
++ * 400/414/495/496/497 처리는 이 헬퍼를 쓰지 않는다.
++ */
++static ngx_int_t
++ngx_http_rokfoss_should_drop(ngx_http_request_t *r,
++    ngx_http_core_loc_conf_t *clcf)
++{
++    if (!clcf->drop_all) {
++        return 0;
++    }
++
++    if (r->headers_in.content_length_n != -1
++        && clcf->client_max_body_size != 0
++        && clcf->client_max_body_size < r->headers_in.content_length_n)
++    {
++        return 0;
++    }
++
++    return 1;
++}
++
++
++/*
 + * ROKFOSS: if 로 켜진 drop_all 을 처리하는 preaccess 핸들러.
 + * 반환한 NGX_HTTP_CLOSE 를 단계 엔진이 finalize 해 응답 없이 연결을 끊는다.
 + */
@@ -98,7 +147,7 @@ index 30ae6e0..e3a82e8 100644
 +
 +    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
 +
-+    if (!clcf->drop_all) {
++    if (!ngx_http_rokfoss_should_drop(r, clcf)) {
 +        return NGX_DECLINED;
 +    }
 +
@@ -122,7 +171,7 @@ index 30ae6e0..e3a82e8 100644
  static void *
  ngx_http_core_create_main_conf(ngx_conf_t *cf)
  {
-@@ -3759,6 +3833,7 @@ ngx_http_core_create_loc_conf(ngx_conf_t *cf)
+@@ -3759,6 +3894,7 @@
      clcf->absolute_redirect = NGX_CONF_UNSET;
      clcf->server_name_in_redirect = NGX_CONF_UNSET;
      clcf->port_in_redirect = NGX_CONF_UNSET;
@@ -130,7 +179,7 @@ index 30ae6e0..e3a82e8 100644
      clcf->msie_padding = NGX_CONF_UNSET;
      clcf->msie_refresh = NGX_CONF_UNSET;
      clcf->log_not_found = NGX_CONF_UNSET;
-@@ -4035,6 +4110,7 @@ ngx_http_core_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
+@@ -4035,6 +4171,7 @@
      ngx_conf_merge_value(conf->server_name_in_redirect,
                                prev->server_name_in_redirect, 0);
      ngx_conf_merge_value(conf->port_in_redirect, prev->port_in_redirect, 1);
