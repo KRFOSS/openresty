@@ -1,0 +1,28 @@
+--- a/src/stream/ngx_stream_script.c
++++ b/src/stream/ngx_stream_script.c
+@@ -889,7 +889,10 @@
+             }
+ 
+             p = e->pos;
+-            e->pos = ngx_copy(p, value->data, value->len);
++
++            if (value->len) {
++                e->pos = ngx_copy(p, value->data, value->len);
++            }
+ 
+             ngx_log_debug2(NGX_LOG_DEBUG_STREAM,
+                            e->session->connection->log, 0,
+--- a/src/http/ngx_http_script.c
++++ b/src/http/ngx_http_script.c
+@@ -1024,7 +1024,10 @@
+             }
+ 
+             p = e->pos;
+-            e->pos = ngx_copy(p, value->data, value->len);
++
++            if (value->len) {
++                e->pos = ngx_copy(p, value->data, value->len);
++            }
+ 
+             ngx_log_debug2(NGX_LOG_DEBUG_HTTP,
+                            e->request->connection->log, 0,

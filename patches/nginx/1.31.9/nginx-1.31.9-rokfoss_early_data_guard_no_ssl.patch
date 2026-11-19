@@ -1,0 +1,30 @@
+--- a/src/http/ngx_http_request.h
++++ b/src/http/ngx_http_request.h
+@@ -111,7 +111,9 @@
+ #define NGX_HTTP_TOO_EARLY                 425
+ #define NGX_HTTP_TOO_MANY_REQUESTS         429
+ 
++#if (NGX_HTTP_SSL)
+ ngx_int_t ngx_http_rokfoss_early_data_guard(ngx_http_request_t *r);
++#endif
+ 
+ 
+ /* Our own HTTP codes */
+--- a/src/http/ngx_http_script.c
++++ b/src/http/ngx_http_script.c
+@@ -1610,6 +1610,7 @@
+         return;
+     }
+ 
++#if (NGX_HTTP_SSL)
+     /*
+      * ROKFOSS: return 은 rewrite 단계에서 요청을 끝내므로 preaccess 의
+      * 0-RTT 가드를 통과하지 않는다. 같은 판정을 return 직전에도 한다.
+@@ -1620,6 +1621,7 @@
+ 
+         return;
+     }
++#endif
+ 
+     if (code->status < NGX_HTTP_BAD_REQUEST
+         || code->text.value.len

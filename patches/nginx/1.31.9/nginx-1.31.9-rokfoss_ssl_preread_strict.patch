@@ -1,0 +1,47 @@
+--- a/src/stream/ngx_stream_ssl_preread_module.c
++++ b/src/stream/ngx_stream_ssl_preread_module.c
+@@ -296,6 +296,13 @@
+             break;
+ 
+         case sw_sid_len:
++            if (p[0] > 32) {
++                ngx_log_debug1(NGX_LOG_DEBUG_STREAM, ctx->log, 0,
++                               "ssl preread: session_id length too big: %d",
++                               (int) p[0]);
++                return NGX_DECLINED;
++            }
++
+             state = sw_sid;
+             dst = NULL;
+             size = p[0];
+@@ -308,9 +315,16 @@
+             break;
+ 
+         case sw_cs_len:
++            size = (p[0] << 8) + p[1];
++
++            if (size == 0 || (size & 1)) {
++                ngx_log_debug0(NGX_LOG_DEBUG_STREAM, ctx->log, 0,
++                               "ssl preread: invalid cipher_suites length");
++                return NGX_DECLINED;
++            }
++
+             state = sw_cs;
+             dst = NULL;
+-            size = (p[0] << 8) + p[1];
+             break;
+ 
+         case sw_cs:
+@@ -320,6 +334,12 @@
+             break;
+ 
+         case sw_cm_len:
++            if (p[0] == 0) {
++                ngx_log_debug0(NGX_LOG_DEBUG_STREAM, ctx->log, 0,
++                               "ssl preread: empty compression_methods");
++                return NGX_DECLINED;
++            }
++
+             state = sw_cm;
+             dst = NULL;
+             size = p[0];

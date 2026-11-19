@@ -757,6 +757,17 @@ echo "$info_txt applying the ROKFOSS 0-RTT early data idempotency guard patch fo
 patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_early_data_guard.patch || exit 1
 echo
 
+echo "$info_txt applying the ROKFOSS ssl_preread strictness patch for nginx"
+patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_ssl_preread_strict.patch || exit 1
+echo
+
+echo "$info_txt applying the ROKFOSS script NULL copy fix patch for nginx"
+patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_script_null_copy.patch || exit 1
+echo
+echo "$info_txt applying the ROKFOSS early data guard without-http_ssl build fix patch for nginx"
+patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_early_data_guard_no_ssl.patch || exit 1
+echo
+
 cp $root/html/index.html html/ || exit 1
 cp $root/html/50x.html html/ || exit 1
 
