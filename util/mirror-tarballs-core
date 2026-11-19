@@ -757,6 +757,10 @@ echo "$info_txt applying the ROKFOSS 0-RTT early data idempotency guard patch fo
 patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_early_data_guard.patch || exit 1
 echo
 
+echo "$info_txt applying the ROKFOSS DAV disable_symlinks patch for nginx"
+patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_dav_symlink.patch || exit 1
+echo
+
 echo "$info_txt applying the ROKFOSS ssl_preread strictness patch for nginx"
 patch -p1 < $root/patches/nginx/$main_ver/nginx-$main_ver-rokfoss_ssl_preread_strict.patch || exit 1
 echo
