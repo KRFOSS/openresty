@@ -120,8 +120,8 @@ index 80e006b..c10ea71 100644
 +            p++;
 +        }
 +
-+        if ((len == 3 && ngx_strncasecmp(name, "uri", 3) == 0)
-+            || (len == 12 && ngx_strncasecmp(name, "document_uri", 12) == 0))
++        if ((len == 3 && ngx_strncasecmp(name, (u_char *) "uri", 3) == 0)
++            || (len == 12 && ngx_strncasecmp(name, (u_char *) "document_uri", 12) == 0))
 +        {
 +            ngx_conf_log_error(NGX_LOG_WARN, cf, 0,
 +                "주의: %V 에 $uri 를 쓰면 정규화된 경로로 캐시 키가 만들어져 "
