@@ -127,6 +127,7 @@ jobs:
           util/mirror-tarballs
           cd "openresty-$(./util/ver)"
           ./configure \
+            --with-http_v2_module \
             --with-http_v3_module \
             --with-stream_realip_module \
             --with-http_realip_module \
