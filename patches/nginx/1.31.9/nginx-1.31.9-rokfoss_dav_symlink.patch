@@ -50,7 +50,7 @@
      switch (r->method) {
  
      case NGX_HTTP_PUT:
-@@ -205,6 +233,105 @@
+@@ -205,6 +233,104 @@
  }
  
  
@@ -71,7 +71,6 @@
 +    ngx_memzero(&of, sizeof(ngx_open_file_info_t));
 +
 +    of.test_only = 1;
-+    of.log = 1;
 +    of.valid = clcf->open_file_cache_valid;
 +    of.min_uses = clcf->open_file_cache_min_uses;
 +    of.errors = clcf->open_file_cache_errors;
@@ -156,7 +155,7 @@
  static void
  ngx_http_dav_put_handler(ngx_http_request_t *r)
  {
-@@ -744,6 +871,12 @@
+@@ -744,6 +870,12 @@
      ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                     "http copy to: \"%s\"", copy.path.data);
  
