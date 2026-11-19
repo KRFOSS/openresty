@@ -4,14 +4,9 @@ on:
   pull_request_target:
     types:
       - opened
+      - reopened
       - edited
       - synchronize
-    paths-ignore:
-      - '.github/workflows/**'
-      - 'doc/**'
-      - '**/*.md'
-      - '**/*.markdown'
-      - '**/COPYRIGHT'
 
 permissions:
   pull-requests: read
