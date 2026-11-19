@@ -1,19 +1,16 @@
 name: Linting on markdown files
 on:
-  pull_request_target:
-    paths-ignore:
-      - '.github/workflows/**'
-      - 'doc/**'
-      - '**/*.md'
-      - '**/*.markdown'
-      - '**/COPYRIGHT'
+  pull_request:
+    paths:
+      - 'content/**/*.md'
+      - '.markdownlint.jsonc'
+      - '.github/workflows/markdownlint.yml'
   push:
-    paths-ignore:
-      - '.github/workflows/**'
-      - 'doc/**'
-      - '**/*.md'
-      - '**/*.markdown'
-      - '**/COPYRIGHT'
+    paths:
+      - 'content/**/*.md'
+      - '.markdownlint.jsonc'
+      - '.github/workflows/markdownlint.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
