@@ -25,7 +25,7 @@ index 30ae6e0..e3a82e8 100644
      { ngx_string("msie_padding"),
        NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_FLAG,
        ngx_conf_set_flag_slot,
-@@ -1009,6 +1018,25 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
+@@ -1009,6 +1018,31 @@ ngx_http_core_find_config_phase(ngx_http_request_t *r,
  
      ngx_http_update_location_config(r);
  
@@ -37,8 +37,14 @@ index 30ae6e0..e3a82e8 100644
 +     * access log 에는 999 로 남는다.
 +     */
 +    if (clcf->drop_all) {
-+        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
-+                      "dropped by drop_all: \"%V?%V\"", &r->uri, &r->args);
++        if (r->args.len) {
++            ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
++                          "dropped by drop_all: \"%V?%V\"", &r->uri, &r->args);
++
++        } else {
++            ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
++                          "dropped by drop_all: \"%V\"", &r->uri);
++        }
 +
 +        r->err_status = NGX_HTTP_ROKFOSS_DROP;
 +        r->keepalive = 0;
@@ -51,7 +57,7 @@ index 30ae6e0..e3a82e8 100644
      ngx_log_debug2(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                     "http cl:%O max:%O",
                     r->headers_in.content_length_n, clcf->client_max_body_size);
-@@ -3508,12 +3536,58 @@ ngx_http_core_preconfiguration(ngx_conf_t *cf)
+@@ -3508,12 +3536,64 @@ ngx_http_core_preconfiguration(ngx_conf_t *cf)
  static ngx_int_t
  ngx_http_core_postconfiguration(ngx_conf_t *cf)
  {
@@ -96,8 +102,14 @@ index 30ae6e0..e3a82e8 100644
 +        return NGX_DECLINED;
 +    }
 +
-+    ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
-+                  "dropped by drop_all: \"%V?%V\"", &r->uri, &r->args);
++    if (r->args.len) {
++        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
++                      "dropped by drop_all: \"%V?%V\"", &r->uri, &r->args);
++
++    } else {
++        ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
++                      "dropped by drop_all: \"%V\"", &r->uri);
++    }
 +
 +    r->err_status = NGX_HTTP_ROKFOSS_DROP;
 +    r->keepalive = 0;
@@ -200,7 +212,7 @@ index c07f2a5..8dad6fd 100644
 diff --git a/src/http/ngx_http_script.c b/src/http/ngx_http_script.c
 --- a/src/http/ngx_http_script.c
 +++ b/src/http/ngx_http_script.c
-@@ -1570,10 +1570,37 @@
+@@ -1570,10 +1570,43 @@
  void
  ngx_http_script_return_code(ngx_http_script_engine_t *e)
  {
@@ -221,9 +233,15 @@ diff --git a/src/http/ngx_http_script.c b/src/http/ngx_http_script.c
 +    clcf = ngx_http_get_module_loc_conf(e->request, ngx_http_core_module);
 +
 +    if (clcf->drop_all) {
-+        ngx_log_error(NGX_LOG_INFO, e->request->connection->log, 0,
-+                      "dropped by drop_all: \"%V?%V\"",
-+                      &e->request->uri, &e->request->args);
++        if (e->request->args.len) {
++            ngx_log_error(NGX_LOG_INFO, e->request->connection->log, 0,
++                          "dropped by drop_all: \"%V?%V\"",
++                          &e->request->uri, &e->request->args);
++
++        } else {
++            ngx_log_error(NGX_LOG_INFO, e->request->connection->log, 0,
++                          "dropped by drop_all: \"%V\"", &e->request->uri);
++        }
 +
 +        e->request->err_status = NGX_HTTP_ROKFOSS_DROP;
 +        e->request->keepalive = 0;

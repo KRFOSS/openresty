@@ -1,0 +1,213 @@
+diff --git a/src/http/modules/ngx_http_ssl_module.h b/src/http/modules/ngx_http_ssl_module.h
+--- a/src/http/modules/ngx_http_ssl_module.h
++++ b/src/http/modules/ngx_http_ssl_module.h
+@@ -20,6 +20,7 @@
+     ngx_flag_t                      prefer_server_ciphers;
+     ngx_flag_t                      certificate_compression;
+     ngx_flag_t                      early_data;
++    ngx_flag_t                      early_data_idempotent_only;
+     ngx_flag_t                      reject_handshake;
+ 
+     ngx_uint_t                      protocols;
+diff --git a/src/http/modules/ngx_http_ssl_module.c b/src/http/modules/ngx_http_ssl_module.c
+--- a/src/http/modules/ngx_http_ssl_module.c
++++ b/src/http/modules/ngx_http_ssl_module.c
+@@ -56,6 +56,7 @@
+     void *data);
+ 
+ static ngx_int_t ngx_http_ssl_init(ngx_conf_t *cf);
++static ngx_int_t ngx_http_ssl_early_data_handler(ngx_http_request_t *r);
+ #if (NGX_QUIC_OPENSSL_COMPAT)
+ static ngx_int_t ngx_http_ssl_quic_compat_init(ngx_conf_t *cf,
+     ngx_http_conf_addr_t *addr);
+@@ -299,6 +300,13 @@
+       offsetof(ngx_http_ssl_srv_conf_t, early_data),
+       NULL },
+ 
++    { ngx_string("ssl_early_data_idempotent_only"),
++      NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
++      ngx_conf_set_flag_slot,
++      NGX_HTTP_SRV_CONF_OFFSET,
++      offsetof(ngx_http_ssl_srv_conf_t, early_data_idempotent_only),
++      NULL },
++
+     { ngx_string("ssl_conf_command"),
+       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_CONF_TAKE2,
+       ngx_conf_set_keyval_slot,
+@@ -653,6 +661,7 @@
+     sscf->prefer_server_ciphers = NGX_CONF_UNSET;
+     sscf->certificate_compression = NGX_CONF_UNSET;
+     sscf->early_data = NGX_CONF_UNSET;
++    sscf->early_data_idempotent_only = NGX_CONF_UNSET;
+     sscf->reject_handshake = NGX_CONF_UNSET;
+     sscf->buffer_size = NGX_CONF_UNSET_SIZE;
+     sscf->verify = NGX_CONF_UNSET_UINT;
+@@ -694,6 +703,8 @@
+                          prev->certificate_compression, 0);
+ 
+     ngx_conf_merge_value(conf->early_data, prev->early_data, 0);
++    ngx_conf_merge_value(conf->early_data_idempotent_only,
++                         prev->early_data_idempotent_only, 1);
+     ngx_conf_merge_value(conf->reject_handshake, prev->reject_handshake, 0);
+ 
+     ngx_conf_merge_bitmask_value(conf->protocols, prev->protocols,
+@@ -1375,10 +1386,64 @@
+ }
+ 
+ 
++/*
++ * ROKFOSS: 0-RTT로 온 비멱등 요청을 서버가 스스로 거부한다.
++ *
++ * nginx는 OpenSSL anti-replay를 끄고 자체 세션 캐시를 쓰므로 같은 티켓으로
++ * 재전송한 0-RTT 요청이 여러 번 실행된다. RFC 8446 section 8에 따라
++ * 멱등 메서드(GET/HEAD/OPTIONS)만 0-RTT를 허용하고 나머지는 425로 되돌린다.
++ * r->args는 로그에 넣지 않는다 (길이 0일 때 data가 NULL).
++ */
++ngx_int_t
++ngx_http_rokfoss_early_data_guard(ngx_http_request_t *r)
++{
++    ngx_str_t                  early;
++    ngx_http_ssl_srv_conf_t   *sscf;
++
++    if (r->connection->ssl == NULL) {
++        return NGX_DECLINED;
++    }
++
++    sscf = ngx_http_get_module_srv_conf(r, ngx_http_ssl_module);
++
++    if (!sscf->early_data_idempotent_only) {
++        return NGX_DECLINED;
++    }
++
++    if (ngx_ssl_get_early_data(r->connection, r->pool, &early) != NGX_OK) {
++        return NGX_DECLINED;
++    }
++
++    if (early.len != 1 || early.data[0] != '1') {
++        return NGX_DECLINED;
++    }
++
++    if (r->method == NGX_HTTP_GET || r->method == NGX_HTTP_HEAD
++        || r->method == NGX_HTTP_OPTIONS)
++    {
++        return NGX_DECLINED;
++    }
++
++    ngx_log_error(NGX_LOG_INFO, r->connection->log, 0,
++                  "0-RTT 로 온 비멱등 요청을 거부했습니다: \"%V %V\"",
++                  &r->method_name, &r->uri);
++
++    return NGX_HTTP_TOO_EARLY;
++}
++
++
++static ngx_int_t
++ngx_http_ssl_early_data_handler(ngx_http_request_t *r)
++{
++    return ngx_http_rokfoss_early_data_guard(r);
++}
++
++
+ static ngx_int_t
+ ngx_http_ssl_init(ngx_conf_t *cf)
+ {
+     ngx_uint_t                   a, p, s;
++    ngx_http_handler_pt         *h;
+ #if (NGX_QUIC_OPENSSL_COMPAT)
+     ngx_uint_t                   compat;
+ #endif
+@@ -1393,6 +1451,13 @@
+     cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
+     cscfp = cmcf->servers.elts;
+ 
++    h = ngx_array_push(&cmcf->phases[NGX_HTTP_PREACCESS_PHASE].handlers);
++    if (h == NULL) {
++        return NGX_ERROR;
++    }
++
++    *h = ngx_http_ssl_early_data_handler;
++
+     for (s = 0; s < cmcf->servers.nelts; s++) {
+ 
+         sscf = cscfp[s]->ctx->srv_conf[ngx_http_ssl_module.ctx_index];
+diff --git a/src/http/ngx_http_special_response.c b/src/http/ngx_http_special_response.c
+--- a/src/http/ngx_http_special_response.c
++++ b/src/http/ngx_http_special_response.c
+@@ -13,6 +13,22 @@
+ #include "ngx_http_rokfoss_error_pages.h"
+ 
+ 
++/*
++ * ROKFOSS: 425 Too Early - 0-RTT로 온 비멱등 요청 거부 페이지.
++ * 기존 builtin_error_page_footer 패치의 head/page/tail 3부 조립을 따라
++ * 우리 오류 페이지 테이블의 425 슬롯만 채운다.
++ * 배열 크기와 NGX_HTTP_LAST_4XX 불변식은 바꾸지 않는다.
++ */
++static char ngx_http_error_425_page[] =
++"<h1>425</h1>" CRLF
++"<p class=\"error-title\">요청이 너무 일렀습니다.</p>" CRLF
++"<p><strong id=\"dynamic-domain\">이 서버</strong>에서 0-RTT로 받은 요청은 "
++"중복 실행될 수 있어 처리할 수 없습니다.</p>" CRLF
++"<p class=\"footer-text\">전송을 반복하지 마시고, 기대 했다가 다시 시도해 주세요.</p>" CRLF
++;
++
++
++
+ static ngx_int_t ngx_http_send_error_page(ngx_http_request_t *r,
+     ngx_http_err_page_t *err_page);
+ static ngx_int_t ngx_http_send_special_response(ngx_http_request_t *r,
+@@ -67,7 +83,7 @@
+     ngx_null_string,                     /* 422 */
+     ngx_null_string,                     /* 423 */
+     ngx_null_string,                     /* 424 */
+-    ngx_null_string,                     /* 425 */
++    ngx_string(ngx_http_error_425_page), /* 425 */
+     ngx_null_string,                     /* 426 */
+     ngx_null_string,                     /* 427 */
+     ngx_null_string,                     /* 428 */
+diff --git a/src/http/ngx_http_header_filter_module.c b/src/http/ngx_http_header_filter_module.c
+--- a/src/http/ngx_http_header_filter_module.c
++++ b/src/http/ngx_http_header_filter_module.c
+@@ -109,7 +109,7 @@
+     ngx_null_string,  /* "422 Unprocessable Entity" */
+     ngx_null_string,  /* "423 Locked" */
+     ngx_null_string,  /* "424 Failed Dependency" */
+-    ngx_null_string,  /* "425 unused" */
++    ngx_string("425 Too Early"),
+     ngx_null_string,  /* "426 Upgrade Required" */
+     ngx_null_string,  /* "427 unused" */
+     ngx_null_string,  /* "428 Precondition Required" */
+diff --git a/src/http/ngx_http_request.h b/src/http/ngx_http_request.h
+--- a/src/http/ngx_http_request.h
++++ b/src/http/ngx_http_request.h
+@@ -108,6 +108,9 @@
+ #define NGX_HTTP_UNSUPPORTED_MEDIA_TYPE    415
+ #define NGX_HTTP_RANGE_NOT_SATISFIABLE     416
+ #define NGX_HTTP_MISDIRECTED_REQUEST       421
++#define NGX_HTTP_TOO_EARLY                 425
+ #define NGX_HTTP_TOO_MANY_REQUESTS         429
++
++ngx_int_t ngx_http_rokfoss_early_data_guard(ngx_http_request_t *r);
+ 
+ 
+diff --git a/src/http/ngx_http_script.c b/src/http/ngx_http_script.c
+--- a/src/http/ngx_http_script.c
++++ b/src/http/ngx_http_script.c
+@@ -1607,6 +1607,17 @@
+         return;
+     }
+ 
++    /*
++     * ROKFOSS: return 은 rewrite 단계에서 요청을 끝내므로 preaccess 의
++     * 0-RTT 가드를 통과하지 않는다. 같은 판정을 return 직전에도 한다.
++     */
++    if (ngx_http_rokfoss_early_data_guard(e->request) == NGX_HTTP_TOO_EARLY) {
++        e->status = NGX_HTTP_TOO_EARLY;
++        e->ip = ngx_http_script_exit;
++
++        return;
++    }
++
+     if (code->status < NGX_HTTP_BAD_REQUEST
+         || code->text.value.len
+         || code->text.lengths)
