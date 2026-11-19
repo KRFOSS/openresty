@@ -20,9 +20,10 @@ $nginx = File::Spec->catfile($prefix, 'bin', 'openresty') unless -x $nginx;
 
 my $PORT_ON  = 19871;
 my $PORT_OFF = 19872;
-my $CERT      = '/root/scan/F06/certs/server.crt';
-my $KEY       = '/root/scan/F06/certs/server.key';
-my $TICKETKEY = '/root/scan/F06/certs/ticket.key';
+my $certdir   = File::Spec->catdir($dir, 'certs');
+my $CERT      = File::Spec->catfile($certdir, 'server.crt');
+my $KEY       = File::Spec->catfile($certdir, 'server.key');
+my $TICKETKEY = File::Spec->catfile($certdir, 'ticket.key');
 
 sub write_file {
     my ($path, $content) = @_;
@@ -41,9 +42,28 @@ sub read_file {
 }
 
 my $dir = tempdir(CLEANUP => 1);
+make_path($certdir);
 make_path(File::Spec->catdir($dir, 'logs'));
 make_path(File::Spec->catdir($dir, 'body'));
 make_path(File::Spec->catdir($dir, 'client_body_temp'));
+
+# Generate test-only TLS material inside the temporary directory so the test
+# does not depend on host-specific paths or certificate file permissions.
+my ($cert_out, $cert_err);
+my $cert_input = '';
+run3([
+    'openssl', 'req', '-x509', '-newkey', 'rsa:2048',
+    '-nodes', '-days', '1',
+    '-subj', '/CN=localhost',
+    '-keyout', $KEY, '-out', $CERT,
+], \$cert_input, \$cert_out, \$cert_err);
+die "cannot generate test certificate: $cert_err" if $? != 0;
+
+my ($ticket_out, $ticket_err);
+my $ticket_input = '';
+run3(['openssl', 'rand', '-out', $TICKETKEY, '48'],
+     \$ticket_input, \$ticket_out, \$ticket_err);
+die "cannot generate TLS session ticket key: $ticket_err" if $? != 0;
 
 my $conf = File::Spec->catfile($dir, 'nginx.conf');
 my $common = <<"SSL";
