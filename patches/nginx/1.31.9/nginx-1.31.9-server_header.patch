@@ -11,10 +11,10 @@ index 370da33..187c1e3 100644
  
  #ifdef NGX_BUILD
 -#define NGINX_VER_BUILD    NGINX_VER " (" NGX_BUILD ")"
-+#define NGINX_VER_BUILD    NGINX_VER ""
++#define NGINX_VER_BUILD    NGINX_VER "-R"
  #else
 -#define NGINX_VER_BUILD    NGINX_VER
-+#define NGINX_VER_BUILD    NGINX_VER ""
++#define NGINX_VER_BUILD    NGINX_VER "-R"
  #endif
  
  #define NGINX_VAR          "NGINX"

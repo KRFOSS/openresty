@@ -16,7 +16,7 @@ index bc902d2..c2929ec 100644
 +static ngx_uint_t  ngx_conf_include_depth;
 +
 +
-+static char *
++char *
 +ngx_conf_include_parse(ngx_conf_t *cf, ngx_str_t *file)
 +{
 +    char  *rv;
@@ -59,3 +59,40 @@ index bc902d2..c2929ec 100644
  
          if (rv != NGX_CONF_OK) {
              break;
+diff --git a/src/core/ngx_conf_file.h b/src/core/ngx_conf_file.h
+--- a/src/core/ngx_conf_file.h
++++ b/src/core/ngx_conf_file.h
+@@ -272,6 +272,7 @@
+ char *ngx_conf_param(ngx_conf_t *cf);
+ char *ngx_conf_parse(ngx_conf_t *cf, ngx_str_t *filename);
+ char *ngx_conf_include(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
++char *ngx_conf_include_parse(ngx_conf_t *cf, ngx_str_t *file);
+ 
+ 
+ ngx_int_t ngx_conf_full_name(ngx_cycle_t *cycle, ngx_str_t *name,
+diff --git a/src/http/modules/ngx_http_geo_module.c b/src/http/modules/ngx_http_geo_module.c
+--- a/src/http/modules/ngx_http_geo_module.c
++++ b/src/http/modules/ngx_http_geo_module.c
+@@ -1406,7 +1406,8 @@
+ 
+     ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "include %s", file.data);
+ 
+-    rv = ngx_conf_parse(cf, &file);
++    /* ROKFOSS: 직접 ngx_conf_parse 를 부르면 include 깊이 카운터를 우회한다. */
++    rv = ngx_conf_include_parse(cf, &file);
+ 
+     ctx->includes++;
+     ctx->outside_entries = 0;
+diff --git a/src/stream/ngx_stream_geo_module.c b/src/stream/ngx_stream_geo_module.c
+--- a/src/stream/ngx_stream_geo_module.c
++++ b/src/stream/ngx_stream_geo_module.c
+@@ -1332,7 +1332,8 @@
+ 
+     ngx_log_debug1(NGX_LOG_DEBUG_CORE, cf->log, 0, "include %s", file.data);
+ 
+-    rv = ngx_conf_parse(cf, &file);
++    /* ROKFOSS: 직접 ngx_conf_parse 를 부르면 include 깊이 카운터를 우회한다. */
++    rv = ngx_conf_include_parse(cf, &file);
+ 
+     ctx->includes++;
+     ctx->outside_entries = 0;
