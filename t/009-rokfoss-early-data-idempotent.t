@@ -20,10 +20,7 @@ $nginx = File::Spec->catfile($prefix, 'bin', 'openresty') unless -x $nginx;
 
 my $PORT_ON  = 19871;
 my $PORT_OFF = 19872;
-my $certdir   = File::Spec->catdir($dir, 'certs');
-my $CERT      = File::Spec->catfile($certdir, 'server.crt');
-my $KEY       = File::Spec->catfile($certdir, 'server.key');
-my $TICKETKEY = File::Spec->catfile($certdir, 'ticket.key');
+my ($CERT, $KEY, $TICKETKEY);
 
 sub write_file {
     my ($path, $content) = @_;
@@ -42,6 +39,10 @@ sub read_file {
 }
 
 my $dir = tempdir(CLEANUP => 1);
+my $certdir = File::Spec->catdir($dir, 'certs');
+$CERT      = File::Spec->catfile($certdir, 'server.crt');
+$KEY       = File::Spec->catfile($certdir, 'server.key');
+$TICKETKEY = File::Spec->catfile($certdir, 'ticket.key');
 make_path($certdir);
 make_path(File::Spec->catdir($dir, 'logs'));
 make_path(File::Spec->catdir($dir, 'body'));
